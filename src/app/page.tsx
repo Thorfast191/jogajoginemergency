@@ -1,69 +1,98 @@
-import Image from "next/image";
+import Link from "next/link";
+import { SiteNav } from "@/components/site-nav";
+import { SiteFooter } from "@/components/site-footer";
+
+const steps = [
+  {
+    title: "1. Get your tags",
+    body: "Subscribe and we generate unique QR stickers tied to your account. Stick them on your bag, bike, laptop, or car.",
+  },
+  {
+    title: "2. Lost item gets found",
+    body: "Anyone who finds it scans the QR code with their phone camera — no app, no login required.",
+  },
+  {
+    title: "3. You get reconnected",
+    body: "The finder sees only what you chose to share, and can message you through a masked relay. Your number stays private.",
+  },
+];
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
+    <div className="flex flex-col min-h-screen">
+      <SiteNav />
+      <main className="flex-1">
+        <section className="mx-auto max-w-6xl px-4 py-20 sm:py-28 text-center">
+          <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-balance">
+            Lost items find their way home.
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="mt-5 text-lg text-black/60 max-w-2xl mx-auto text-balance">
+            Jogajog Emergency puts a scannable QR sticker on everything that matters — bags,
+            bikes, laptops, cars — so a stranger can reach you the moment it&apos;s found,
+            without ever seeing your phone number.
           </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+          <div className="mt-8 flex items-center justify-center gap-4">
+            <Link
+              href="/signup"
+              className="rounded-md bg-emerald-600 text-white px-6 py-3 font-medium hover:bg-emerald-700"
+            >
+              Get your first tag
+            </Link>
+            <Link
+              href="/pricing"
+              className="rounded-md border border-black/15 px-6 py-3 font-medium hover:bg-black/5"
+            >
+              See pricing
+            </Link>
+          </div>
+        </section>
+
+        <section className="border-t border-black/10 bg-black/[0.02]">
+          <div className="mx-auto max-w-6xl px-4 py-16 grid sm:grid-cols-3 gap-8">
+            {steps.map((s) => (
+              <div key={s.title}>
+                <h3 className="font-semibold">{s.title}</h3>
+                <p className="mt-2 text-sm text-black/60">{s.body}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="mx-auto max-w-6xl px-4 py-16">
+          <h2 className="text-2xl font-semibold text-center">Built to protect your privacy</h2>
+          <div className="mt-8 grid sm:grid-cols-2 gap-6">
+            <div className="rounded-lg border border-black/10 p-6">
+              <h3 className="font-medium">No number ever shown</h3>
+              <p className="mt-2 text-sm text-black/60">
+                Finders message you through a masked relay by default — your real phone number
+                and email are never displayed on the public scan page.
+              </p>
+            </div>
+            <div className="rounded-lg border border-black/10 p-6">
+              <h3 className="font-medium">You control what&apos;s public</h3>
+              <p className="mt-2 text-sm text-black/60">
+                Choose a display name, a custom message, and whether to expose a masked
+                click-to-call number instead of the relay form.
+              </p>
+            </div>
+            <div className="rounded-lg border border-black/10 p-6">
+              <h3 className="font-medium">Scan notifications</h3>
+              <p className="mt-2 text-sm text-black/60">
+                Get notified the moment your tag is scanned, with the time and an approximate
+                location — so you know your item is being handled.
+              </p>
+            </div>
+            <div className="rounded-lg border border-black/10 p-6">
+              <h3 className="font-medium">Mark items lost instantly</h3>
+              <p className="mt-2 text-sm text-black/60">
+                Flip a tag to &quot;lost&quot; from your dashboard to change what&apos;s shown to
+                finders, or deactivate it entirely if it&apos;s recovered another way.
+              </p>
+            </div>
+          </div>
+        </section>
       </main>
+      <SiteFooter />
     </div>
   );
 }

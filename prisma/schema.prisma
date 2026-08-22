@@ -1,0 +1,247 @@
+// Jogajog Emergency — data model
+// QR-sticker emergency contact / lost-item recovery system
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum TagStatus {
+  UNASSIGNED // printed/generated, not yet claimed by an item
+  ACTIVE
+  LOST
+  DEACTIVATED
+}
+
+enum ContactMode {
+  RELAY // finder sends a message through the platform; phone/email never shown
+  MASKED_PHONE // click-to-call via a proxy/masked number
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  TRIALING
+}
+
+enum PaymentProvider {
+  DEMO
+  SSLCOMMERZ
+  BKASH
+  STRIPE
+}
+
+enum PaymentStatus {
+  SUCCEEDED
+  FAILED
+  PENDING
+}
+
+enum AbuseReportStatus {
+  OPEN
+  REVIEWING
+  RESOLVED
+  DISMISSED
+}
+
+model User {
+  id           String     @id @default(cuid())
+  name         String
+  email        String     @unique
+  emailVerified DateTime?
+  phone        String?
+  passwordHash String
+  role         Role       @default(USER)
+  status       UserStatus @default(ACTIVE)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  items          Item[]
+  tags           Tag[]
+  subscriptions  Subscription[]
+  sessions       Session[]
+  accounts       Account[]
+  abuseReports   AbuseReport[]  @relation("ReportedBy")
+
+  @@index([email])
+}
+
+// Auth.js database session/account tables
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model SubscriptionPlan {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  priceCents  Int
+  currency    String   @default("BDT")
+  maxTags     Int
+  features    String[]
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  subscriptions Subscription[]
+}
+
+model Subscription {
+  id                 String              @id @default(cuid())
+  userId             String
+  planId             String
+  status             SubscriptionStatus  @default(ACTIVE)
+  provider           PaymentProvider     @default(DEMO)
+  currentPeriodEnd   DateTime
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan     SubscriptionPlan @relation(fields: [planId], references: [id])
+  payments Payment[]
+
+  @@index([userId])
+}
+
+model Payment {
+  id             String          @id @default(cuid())
+  subscriptionId String
+  amountCents    Int
+  currency       String          @default("BDT")
+  provider       PaymentProvider @default(DEMO)
+  providerRef    String?
+  status         PaymentStatus   @default(PENDING)
+  createdAt      DateTime        @default(now())
+
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([subscriptionId])
+}
+
+model Item {
+  id        String   @id @default(cuid())
+  userId    String
+  label     String
+  category  String
+  photoUrl  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tags Tag[]
+
+  @@index([userId])
+}
+
+model Tag {
+  id                String      @id @default(cuid())
+  shortCode         String      @unique // used in /t/[shortCode]
+  userId            String
+  itemId            String?
+  status            TagStatus   @default(UNASSIGNED)
+  contactMode       ContactMode @default(RELAY)
+  publicDisplayName String? // e.g. "Arafat's bag" — shown instead of full name
+  publicMessage     String? // owner-authored note shown on the scan page
+  maskedPhone       String? // proxy number used only when contactMode = MASKED_PHONE
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  item        Item?         @relation(fields: [itemId], references: [id], onDelete: SetNull)
+  scanEvents  ScanEvent[]
+  relayMessages RelayMessage[]
+  abuseReports  AbuseReport[]
+
+  @@index([userId])
+  @@index([itemId])
+}
+
+model ScanEvent {
+  id          String   @id @default(cuid())
+  tagId       String
+  scannedAt   DateTime @default(now())
+  ipHash      String // hashed IP, never store raw IP
+  approxCity  String?
+  approxRegion String?
+  approxCountry String?
+  userAgent   String?
+
+  tag Tag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@index([tagId, scannedAt])
+}
+
+model RelayMessage {
+  id            String   @id @default(cuid())
+  tagId         String
+  finderContact String // email or phone the finder left for a reply
+  message       String
+  createdAt     DateTime @default(now())
+  deliveredAt   DateTime?
+
+  tag Tag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@index([tagId])
+}
+
+model AbuseReport {
+  id           String            @id @default(cuid())
+  tagId        String?
+  reportedById String?
+  reason       String
+  details      String?
+  status       AbuseReportStatus @default(OPEN)
+  createdAt    DateTime          @default(now())
+  resolvedAt   DateTime?
+
+  tag        Tag?  @relation(fields: [tagId], references: [id], onDelete: SetNull)
+  reportedBy User? @relation("ReportedBy", fields: [reportedById], references: [id], onDelete: SetNull)
+
+  @@index([tagId])
+}

@@ -1,36 +1,79 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Jogajog Emergency
 
-## Getting Started
+QR-sticker-based emergency contact / lost-item recovery system. Subscribers get unique QR
+tags, stick them on belongings, and anyone who finds the item scans the code to reach the
+owner through a privacy-preserving relay — no app, no login, no exposed phone number.
 
-First, run the development server:
+## Stack
+
+Next.js (App Router) + PostgreSQL + Prisma + Auth.js (credentials, JWT sessions) + Tailwind.
+Payments run through a `DEMO` provider stub (see below) pending a real Bangladesh gateway
+integration.
+
+## Local setup
+
+1. Have a PostgreSQL 14+ instance available and set `DATABASE_URL` in `.env` (copy
+   `.env.example` and fill it in). If you don't have Postgres, `docker compose up -d postgres`
+   spins one up using the credentials already wired into `docker-compose.yml`.
+2. Install dependencies: `npm install`
+3. Apply the schema: `npm run db:migrate`
+4. Seed subscription plans + an admin account: `npm run db:seed`
+   (creates `admin@jogajog.app` / `ChangeMe123!` — change this password immediately)
+5. Run the app: `npm run dev`
+
+## Project layout
+
+- `prisma/schema.prisma` — data model (User, Tag, Item, ScanEvent, RelayMessage,
+  Subscription/Payment, AbuseReport)
+- `src/app/(marketing)` (`/`, `/pricing`) — public marketing pages
+- `src/app/signup`, `src/app/login` — auth
+- `src/app/t/[shortCode]` — the public, no-login scan page a finder lands on
+- `src/app/dashboard/*` — subscriber area: items, tags (QR generation/download, public-page
+  settings, scan log), billing, account settings
+- `src/app/admin/*` — role-gated admin panel: users, tags, subscriptions, abuse reports
+- `src/lib/` — Prisma client, Auth.js config, QR generation, short-code generation, IP
+  hashing, in-memory rate limiter, notification stub, zod validation schemas
+
+## Privacy & abuse-prevention notes
+
+- The public scan page never renders a phone number or email by default. Owners choose
+  between a **relay** (finder leaves a message + contact, the platform would forward it to
+  the owner's real contact) or a **masked click-to-call number** they control — never their
+  raw number.
+- Raw finder IPs are never stored; `src/lib/hash.ts` salts and hashes them before writing a
+  `ScanEvent`.
+- `src/lib/rate-limit.ts` rate-limits scan views, relay message sends, and abuse reports per
+  IP (and per tag) to slow down scraping the short-code space or spamming an owner. It's an
+  in-memory limiter — correct for a single-process VPS deployment; swap it for a shared store
+  (Redis/Postgres) before running multiple app instances behind a load balancer.
+- Short codes are generated from an 8-character, unambiguous 56-character alphabet
+  (`src/lib/short-code.ts`) — ~2×10^14 possible codes, so guessing a live tag isn't practical
+  even combined with the rate limiter.
+
+## What's stubbed / next steps
+
+- **Payments**: `Subscription`/`Payment` records use `provider: DEMO` and are marked
+  succeeded immediately on signup — no money moves. Swap in SSLCommerz or bKash by
+  implementing their checkout/webhook flow and writing to the same `Payment` model
+  (`src/app/signup/actions.ts`, `src/app/dashboard/billing/actions.ts`).
+- **Notifications**: `src/lib/notify.ts` currently just logs scan/relay events to the server
+  console instead of sending email/SMS. Wire in a real provider (SES, a transactional email
+  API, or a local SMS gateway) there.
+- **Scan geolocation**: `ScanEvent.approxCity/Region/Country` exist in the schema but nothing
+  populates them yet — hook up an IP geolocation lookup (with consent/privacy review) in
+  `src/app/t/[shortCode]/page.tsx` if you want that.
+
+## Deployment (self-hosted VPS)
+
+`Dockerfile` builds a standalone Next.js server; `docker-compose.yml` runs it alongside
+Postgres. On the VPS:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+docker compose up -d --build
+docker compose exec app npx prisma migrate deploy
+docker compose exec app npm run db:seed
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Set real values for `AUTH_SECRET`, `NEXTAUTH_URL`, `NEXT_PUBLIC_APP_URL`, and
+`IP_HASH_SALT` in `.env` before deploying — the checked-in `.env.example` values are for
+local development only.

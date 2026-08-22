@@ -1,0 +1,27 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: jogajog
+      POSTGRES_PASSWORD: jogajog
+      POSTGRES_DB: jogajog_emergency
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://jogajog:jogajog@postgres:5432/jogajog_emergency?schema=public
+    ports:
+      - "3000:3000"
+
+volumes:
+  pgdata:
