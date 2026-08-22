@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ItemForm } from "./item-form";
-import { DeleteItemButton } from "./delete-button";
+import { ItemRow } from "./item-row";
 
 export default async function ItemsPage() {
   const session = await auth();
@@ -24,18 +24,7 @@ export default async function ItemsPage() {
 
       <ul className="mt-6 space-y-3">
         {items.map((item) => (
-          <li
-            key={item.id}
-            className="rounded-lg border border-black/10 p-4 flex items-center justify-between"
-          >
-            <div>
-              <p className="font-medium">{item.label}</p>
-              <p className="text-xs text-black/50">
-                {item.category} · {item.tags.length} tag{item.tags.length === 1 ? "" : "s"} attached
-              </p>
-            </div>
-            <DeleteItemButton itemId={item.id} />
-          </li>
+          <ItemRow key={item.id} item={item} tagCount={item.tags.length} />
         ))}
         {items.length === 0 && <p className="text-sm text-black/50">No items yet.</p>}
       </ul>

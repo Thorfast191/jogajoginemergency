@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { requireActiveUser } from "@/lib/session";
 import { signOutAction } from "@/app/dashboard/actions";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +13,11 @@ const links = [
   { href: "/admin/abuse-reports", label: "Abuse reports" },
 ];
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  const user = await requireActiveUser();
+  if (!user) redirect("/login");
+  if (user.role !== "ADMIN") redirect("/dashboard");
+
   return (
     <div className="min-h-screen flex flex-col sm:flex-row">
       <aside className="sm:w-56 border-b sm:border-b-0 sm:border-r border-black/10 p-4 flex sm:flex-col gap-1">

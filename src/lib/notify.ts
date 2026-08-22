@@ -16,6 +16,10 @@ export async function notifyOwnerOfScan(params: {
   );
 }
 
+export async function notifyPasswordReset(params: { email: string; resetUrl: string }) {
+  console.log(`[notify] password reset requested for ${params.email} — would email link: ${params.resetUrl}`);
+}
+
 export async function notifyOwnerOfRelayMessage(params: {
   ownerEmail: string;
   tagShortCode: string;

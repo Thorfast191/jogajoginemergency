@@ -1,17 +1,17 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { auth } from "@/lib/auth";
+import { requireActiveUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 
 export async function changePlanAction(planSlug: string) {
-  const session = await auth();
-  if (!session?.user) return { error: "Not authenticated." };
+  const user = await requireActiveUser();
+  if (!user) return { error: "Not authenticated." };
 
   const plan = await prisma.subscriptionPlan.findUnique({ where: { slug: planSlug } });
   if (!plan) return { error: "Plan not found." };
 
-  const currentTagCount = await prisma.tag.count({ where: { userId: session.user.id } });
+  const currentTagCount = await prisma.tag.count({ where: { userId: user.id } });
   if (currentTagCount > plan.maxTags) {
     return {
       error: `You have ${currentTagCount} tags, which exceeds this plan's limit of ${plan.maxTags}. Remove tags before downgrading.`,
@@ -19,7 +19,7 @@ export async function changePlanAction(planSlug: string) {
   }
 
   const active = await prisma.subscription.findFirst({
-    where: { userId: session.user.id, status: "ACTIVE" },
+    where: { userId: user.id, status: "ACTIVE" },
   });
 
   if (active) {
@@ -42,7 +42,7 @@ export async function changePlanAction(planSlug: string) {
   } else {
     await prisma.subscription.create({
       data: {
-        userId: session.user.id,
+        userId: user.id,
         planId: plan.id,
         status: "ACTIVE",
         provider: "DEMO",

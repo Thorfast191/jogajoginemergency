@@ -2,7 +2,7 @@
 
 import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
-import { auth } from "@/lib/auth";
+import { requireActiveUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 
@@ -17,8 +17,8 @@ export async function updateProfileAction(
   _prevState: ProfileState,
   formData: FormData
 ): Promise<ProfileState> {
-  const session = await auth();
-  if (!session?.user) return { error: "Not authenticated." };
+  const authedUser = await requireActiveUser();
+  if (!authedUser) return { error: "Not authenticated." };
 
   const parsed = profileSchema.safeParse({
     name: formData.get("name"),
@@ -27,7 +27,7 @@ export async function updateProfileAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
 
   await prisma.user.update({
-    where: { id: session.user.id },
+    where: { id: authedUser.id },
     data: { name: parsed.data.name, phone: parsed.data.phone || null },
   });
 
@@ -46,8 +46,8 @@ export async function updatePasswordAction(
   _prevState: PasswordState,
   formData: FormData
 ): Promise<PasswordState> {
-  const session = await auth();
-  if (!session?.user) return { error: "Not authenticated." };
+  const authedUser = await requireActiveUser();
+  if (!authedUser) return { error: "Not authenticated." };
 
   const parsed = passwordSchema.safeParse({
     currentPassword: formData.get("currentPassword"),
@@ -55,7 +55,7 @@ export async function updatePasswordAction(
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
 
-  const user = await prisma.user.findUnique({ where: { id: session.user.id } });
+  const user = await prisma.user.findUnique({ where: { id: authedUser.id } });
   if (!user) return { error: "User not found." };
 
   const valid = await bcrypt.compare(parsed.data.currentPassword, user.passwordHash);

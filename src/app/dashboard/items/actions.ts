@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { auth } from "@/lib/auth";
+import { requireActiveUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { itemSchema } from "@/lib/validations";
 
@@ -11,8 +11,8 @@ export async function createItemAction(
   _prevState: ItemFormState,
   formData: FormData
 ): Promise<ItemFormState> {
-  const session = await auth();
-  if (!session?.user) return { error: "Not authenticated." };
+  const user = await requireActiveUser();
+  if (!user) return { error: "Not authenticated." };
 
   const parsed = itemSchema.safeParse({
     label: formData.get("label"),
@@ -25,7 +25,7 @@ export async function createItemAction(
 
   await prisma.item.create({
     data: {
-      userId: session.user.id,
+      userId: user.id,
       label: parsed.data.label,
       category: parsed.data.category,
       photoUrl: parsed.data.photoUrl || null,
@@ -36,10 +36,41 @@ export async function createItemAction(
   return {};
 }
 
-export async function deleteItemAction(itemId: string) {
-  const session = await auth();
-  if (!session?.user) return;
+export async function updateItemAction(
+  itemId: string,
+  _prevState: ItemFormState,
+  formData: FormData
+): Promise<ItemFormState> {
+  const user = await requireActiveUser();
+  if (!user) return { error: "Not authenticated." };
 
-  await prisma.item.deleteMany({ where: { id: itemId, userId: session.user.id } });
+  const parsed = itemSchema.safeParse({
+    label: formData.get("label"),
+    category: formData.get("category"),
+    photoUrl: formData.get("photoUrl"),
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+
+  const result = await prisma.item.updateMany({
+    where: { id: itemId, userId: user.id },
+    data: {
+      label: parsed.data.label,
+      category: parsed.data.category,
+      photoUrl: parsed.data.photoUrl || null,
+    },
+  });
+  if (result.count === 0) return { error: "Item not found." };
+
+  revalidatePath("/dashboard/items");
+  return {};
+}
+
+export async function deleteItemAction(itemId: string) {
+  const user = await requireActiveUser();
+  if (!user) return;
+
+  await prisma.item.deleteMany({ where: { id: itemId, userId: user.id } });
   revalidatePath("/dashboard/items");
 }

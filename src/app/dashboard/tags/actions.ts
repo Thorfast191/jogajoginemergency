@@ -1,23 +1,23 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { auth } from "@/lib/auth";
+import { requireActiveUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { generateShortCode } from "@/lib/short-code";
 
 export type CreateTagState = { error?: string };
 
 export async function createTagAction(): Promise<CreateTagState> {
-  const session = await auth();
-  if (!session?.user) return { error: "Not authenticated." };
+  const user = await requireActiveUser();
+  if (!user) return { error: "Not authenticated." };
 
   const [subscription, tagCount] = await Promise.all([
     prisma.subscription.findFirst({
-      where: { userId: session.user.id, status: "ACTIVE" },
+      where: { userId: user.id, status: "ACTIVE" },
       include: { plan: true },
       orderBy: { createdAt: "desc" },
     }),
-    prisma.tag.count({ where: { userId: session.user.id } }),
+    prisma.tag.count({ where: { userId: user.id } }),
   ]);
 
   if (!subscription) {
@@ -33,7 +33,7 @@ export async function createTagAction(): Promise<CreateTagState> {
     const shortCode = generateShortCode();
     try {
       await prisma.tag.create({
-        data: { shortCode, userId: session.user.id, status: "UNASSIGNED" },
+        data: { shortCode, userId: user.id, status: "UNASSIGNED" },
       });
       revalidatePath("/dashboard/tags");
       return {};

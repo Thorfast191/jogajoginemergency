@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { auth } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import { requireActiveUser } from "@/lib/session";
 import { signOutAction } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -8,12 +9,14 @@ const links = [
   { href: "/dashboard", label: "Overview" },
   { href: "/dashboard/items", label: "Items" },
   { href: "/dashboard/tags", label: "Tags" },
+  { href: "/dashboard/messages", label: "Messages" },
   { href: "/dashboard/billing", label: "Billing" },
   { href: "/dashboard/settings", label: "Settings" },
 ];
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const session = await auth();
+  const user = await requireActiveUser();
+  if (!user) redirect("/login");
 
   return (
     <div className="min-h-screen flex flex-col sm:flex-row">
@@ -33,7 +36,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           ))}
         </nav>
         <div className="sm:mt-auto flex flex-col gap-2">
-          {session?.user?.role === "ADMIN" && (
+          {user.role === "ADMIN" && (
             <Link href="/admin" className="text-sm px-3 py-2 rounded-md hover:bg-black/5">
               Admin panel →
             </Link>

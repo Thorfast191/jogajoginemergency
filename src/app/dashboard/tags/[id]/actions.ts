@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { auth } from "@/lib/auth";
+import { requireActiveUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { tagUpdateSchema } from "@/lib/validations";
 
@@ -12,10 +12,10 @@ export async function updateTagAction(
   _prevState: TagUpdateState,
   formData: FormData
 ): Promise<TagUpdateState> {
-  const session = await auth();
-  if (!session?.user) return { error: "Not authenticated." };
+  const user = await requireActiveUser();
+  if (!user) return { error: "Not authenticated." };
 
-  const tag = await prisma.tag.findFirst({ where: { id: tagId, userId: session.user.id } });
+  const tag = await prisma.tag.findFirst({ where: { id: tagId, userId: user.id } });
   if (!tag) return { error: "Tag not found." };
 
   const itemIdRaw = formData.get("itemId");
@@ -34,7 +34,7 @@ export async function updateTagAction(
 
   if (parsed.data.itemId) {
     const item = await prisma.item.findFirst({
-      where: { id: parsed.data.itemId, userId: session.user.id },
+      where: { id: parsed.data.itemId, userId: user.id },
     });
     if (!item) return { error: "Item not found." };
   }

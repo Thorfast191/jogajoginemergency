@@ -1,13 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { auth } from "@/lib/auth";
+import { requireActiveUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 
 async function requireAdmin() {
-  const session = await auth();
-  if (session?.user?.role !== "ADMIN") throw new Error("Forbidden");
-  return session;
+  const user = await requireActiveUser();
+  if (user?.role !== "ADMIN") throw new Error("Forbidden");
+  return user;
 }
 
 export async function setUserStatusAction(userId: string, status: "ACTIVE" | "SUSPENDED") {

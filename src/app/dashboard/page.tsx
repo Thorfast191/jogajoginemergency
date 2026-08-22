@@ -6,7 +6,7 @@ export default async function DashboardPage() {
   const session = await auth();
   const userId = session!.user.id;
 
-  const [subscription, tags, recentScans] = await Promise.all([
+  const [subscription, tags, recentScans, recentMessages] = await Promise.all([
     prisma.subscription.findFirst({
       where: { userId, status: "ACTIVE" },
       include: { plan: true },
@@ -17,6 +17,12 @@ export default async function DashboardPage() {
       where: { tag: { userId } },
       include: { tag: { include: { item: true } } },
       orderBy: { scannedAt: "desc" },
+      take: 5,
+    }),
+    prisma.relayMessage.findMany({
+      where: { tag: { userId } },
+      include: { tag: { include: { item: true } } },
+      orderBy: { createdAt: "desc" },
       take: 5,
     }),
   ]);
@@ -78,6 +84,32 @@ export default async function DashboardPage() {
                   {scan.scannedAt.toLocaleString()}
                   {scan.approxCity ? ` · ${scan.approxCity}` : ""}
                 </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div className="mt-10">
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold">Recent messages from finders</h2>
+          <Link href="/dashboard/messages" className="text-xs text-emerald-600 hover:underline">
+            View all
+          </Link>
+        </div>
+        {recentMessages.length === 0 ? (
+          <p className="mt-2 text-sm text-black/60">No messages yet.</p>
+        ) : (
+          <ul className="mt-3 divide-y divide-black/10 rounded-lg border border-black/10">
+            {recentMessages.map((m) => (
+              <li key={m.id} className="p-3 text-sm">
+                <div className="flex justify-between">
+                  <span className="font-medium">
+                    {m.tag.item?.label ?? m.tag.publicDisplayName ?? m.tag.shortCode}
+                  </span>
+                  <span className="text-black/50">{m.createdAt.toLocaleString()}</span>
+                </div>
+                <p className="mt-1 text-black/70">{m.message}</p>
               </li>
             ))}
           </ul>

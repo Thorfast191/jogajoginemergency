@@ -3,18 +3,24 @@ import { notFound } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { generateTagQrDataUrl, tagUrl } from "@/lib/qr";
+import { summarizeUserAgent } from "@/lib/user-agent";
 import { TagSettingsForm } from "./tag-settings-form";
 
 export default async function TagDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const session = await auth();
 
-  const [tag, items, scans] = await Promise.all([
+  const [tag, items, scans, messages] = await Promise.all([
     prisma.tag.findFirst({ where: { id, userId: session!.user.id } }),
     prisma.item.findMany({ where: { userId: session!.user.id }, select: { id: true, label: true } }),
     prisma.scanEvent.findMany({
       where: { tag: { id, userId: session!.user.id } },
       orderBy: { scannedAt: "desc" },
+      take: 20,
+    }),
+    prisma.relayMessage.findMany({
+      where: { tag: { id, userId: session!.user.id } },
+      orderBy: { createdAt: "desc" },
       take: 20,
     }),
   ]);
@@ -63,11 +69,34 @@ export default async function TagDetailPage({ params }: { params: Promise<{ id: 
             ) : (
               <ul className="mt-3 divide-y divide-black/10 rounded-lg border border-black/10">
                 {scans.map((scan) => (
-                  <li key={scan.id} className="p-3 text-sm flex justify-between">
+                  <li key={scan.id} className="p-3 text-sm flex justify-between gap-3">
                     <span>{scan.scannedAt.toLocaleString()}</span>
-                    <span className="text-black/50">
+                    <span className="text-black/50 text-right">
                       {[scan.approxCity, scan.approxCountry].filter(Boolean).join(", ") || "Unknown location"}
+                      <br />
+                      <span className="text-xs">{summarizeUserAgent(scan.userAgent)}</span>
                     </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="mt-8">
+            <h2 className="font-semibold">Messages from finders</h2>
+            {messages.length === 0 ? (
+              <p className="mt-2 text-sm text-black/50">No messages yet.</p>
+            ) : (
+              <ul className="mt-3 space-y-3">
+                {messages.map((m) => (
+                  <li key={m.id} className="rounded-lg border border-black/10 p-3 text-sm">
+                    <div className="flex items-center justify-between text-xs text-black/50">
+                      <span>{m.createdAt.toLocaleString()}</span>
+                    </div>
+                    <p className="mt-1">{m.message}</p>
+                    <p className="mt-1 text-xs text-black/50">
+                      Reply to: <span className="font-medium text-black/70">{m.finderContact}</span>
+                    </p>
                   </li>
                 ))}
               </ul>
