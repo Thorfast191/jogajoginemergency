@@ -11,6 +11,13 @@ const sections: { heading: string; links: { href: string; label: string }[] }[] 
     links: [{ href: "/admin", label: "Overview" }],
   },
   {
+    heading: "Store",
+    links: [
+      { href: "/admin/products", label: "Products" },
+      { href: "/admin/orders", label: "Orders" },
+    ],
+  },
+  {
     heading: "Tag management",
     links: [
       { href: "/admin/tags", label: "Tag Inventory" },

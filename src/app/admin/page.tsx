@@ -5,21 +5,55 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
+// Kept out of the component body so the render stays free of impure calls.
+function daysAgo(days: number): Date {
+  return new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+}
+
 export default async function AdminOverviewPage() {
   if (!(await getAdmin())) redirect("/dashboard");
 
-  const [customers, suspended, unassignedTags, issuedTags, activeSubs, openReports, scanCount] =
-    await Promise.all([
-      prisma.user.count({ where: { role: "USER" } }),
-      prisma.user.count({ where: { role: "USER", status: "SUSPENDED" } }),
-      prisma.tag.count({ where: { status: "UNASSIGNED", userId: null } }),
-      prisma.tag.count({ where: { userId: { not: null } } }),
-      prisma.subscription.count({ where: { status: "ACTIVE" } }),
-      prisma.abuseReport.count({ where: { status: "OPEN" } }),
-      prisma.scanEvent.count(),
-    ]);
+  const weekAgo = daysAgo(7);
+  const [
+    customers,
+    suspended,
+    unassignedTags,
+    issuedTags,
+    allocatedTags,
+    activeSubs,
+    openReports,
+    scanCount,
+    activeProducts,
+    recentOrders,
+    revenue,
+  ] = await Promise.all([
+    prisma.user.count({ where: { role: "USER" } }),
+    prisma.user.count({ where: { role: "USER", status: "SUSPENDED" } }),
+    prisma.tag.count({ where: { status: "UNASSIGNED", userId: null } }),
+    prisma.tag.count({ where: { userId: { not: null } } }),
+    prisma.tag.count({ where: { status: "ALLOCATED" } }),
+    prisma.subscription.count({ where: { status: "ACTIVE" } }),
+    prisma.abuseReport.count({ where: { status: "OPEN" } }),
+    prisma.scanEvent.count(),
+    prisma.product.count({ where: { status: "ACTIVE" } }),
+    prisma.order.count({ where: { placedAt: { gte: weekAgo } } }),
+    prisma.payment.aggregate({
+      _sum: { amountCents: true },
+      where: { kind: "ORDER", status: "SUCCEEDED" },
+    }),
+  ]);
+  const revenueBdt = Math.round((revenue._sum.amountCents ?? 0) / 100);
 
   const groups: { title: string; stats: { label: string; value: number; href?: string }[] }[] = [
+    {
+      title: "Store",
+      stats: [
+        { label: "Active products", value: activeProducts, href: "/admin/products" },
+        { label: "Orders (7 days)", value: recentOrders, href: "/admin/orders" },
+        { label: "Order revenue (BDT)", value: revenueBdt, href: "/admin/orders" },
+        { label: "Tags allocated, not active", value: allocatedTags, href: "/admin/tags" },
+      ],
+    },
     {
       title: "Customers",
       stats: [
