@@ -61,7 +61,6 @@ export async function setTagStatusAction(
       data: {
         status: "UNASSIGNED",
         userId: null,
-        itemId: null,
         orderItemId: null,
         internalLabel: null,
       },

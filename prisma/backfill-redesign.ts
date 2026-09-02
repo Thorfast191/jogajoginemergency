@@ -43,18 +43,21 @@ async function main() {
     data: { productId: legacy.id },
   });
 
-  // 2. internalLabel <- attached Item.label
-  const tagsWithItem = await prisma.tag.findMany({
-    where: { itemId: { not: null }, internalLabel: null },
-    include: { item: true },
-  });
-  for (const t of tagsWithItem) {
-    if (t.item) {
-      await prisma.tag.update({
-        where: { id: t.id },
-        data: { internalLabel: t.item.label },
-      });
+  // 2. internalLabel <- attached Item.label. Raw SQL so the script still
+  //    compiles after migration M3 drops the Item table + Tag.itemId; on a
+  //    post-M3 database this simply finds nothing (or the table is gone).
+  let itemLabels = 0;
+  try {
+    const withItem = await prisma.$queryRaw<Array<{ id: string; label: string }>>`
+      SELECT t."id", i."label"
+      FROM "Tag" t JOIN "Item" i ON i."id" = t."itemId"
+      WHERE t."itemId" IS NOT NULL AND t."internalLabel" IS NULL`;
+    for (const row of withItem) {
+      await prisma.tag.update({ where: { id: row.id }, data: { internalLabel: row.label } });
+      itemLabels++;
     }
+  } catch {
+    // Item table / Tag.itemId already removed (post-M3) — nothing to bridge.
   }
 
   // 3. claimCode for every tag that lacks one. Raw query because after
@@ -78,21 +81,33 @@ async function main() {
     }
   }
 
-  // 4. One EmergencyProfile per user that owns at least one tag
+  // 4. One EmergencyProfile per user that owns at least one tag, seeded from
+  //    that user's most recent tag's old public fields. Raw SQL for the same
+  //    M3-compatibility reason; the pre-M3 columns are read via a LEFT JOIN
+  //    that yields NULLs once they're gone.
   const owners = await prisma.user.findMany({
     where: { tags: { some: {} }, emergencyProfile: null },
-    include: { tags: { orderBy: { updatedAt: "desc" }, take: 1 } },
+    select: { id: true, name: true },
   });
+  let profilesCreated = 0;
   for (const u of owners) {
-    const t = u.tags[0];
-    const direct = t?.contactMode === "MASKED_PHONE";
+    let legacy: { publicDisplayName: string | null; publicMessage: string | null; maskedPhone: string | null; contactMode: string | null } | undefined;
+    try {
+      const rows = await prisma.$queryRaw<Array<typeof legacy & object>>`
+        SELECT "publicDisplayName", "publicMessage", "maskedPhone", "contactMode"::text AS "contactMode"
+        FROM "Tag" WHERE "userId" = ${u.id} ORDER BY "updatedAt" DESC LIMIT 1`;
+      legacy = rows[0];
+    } catch {
+      legacy = undefined;
+    }
+    const direct = legacy?.contactMode === "MASKED_PHONE";
     await prisma.emergencyProfile.create({
       data: {
         userId: u.id,
-        displayName: t?.publicDisplayName ?? u.name,
-        emergencyMessage: t?.publicMessage ?? null,
+        displayName: legacy?.publicDisplayName ?? u.name,
+        emergencyMessage: legacy?.publicMessage ?? null,
         contactMode: direct ? "DIRECT_CALL" : "RELAY",
-        phonePublic: t?.maskedPhone ?? null,
+        phonePublic: legacy?.maskedPhone ?? null,
         showPhone: direct,
         visibilityPreset: "STANDARD",
         photoPublic: true,
@@ -104,6 +119,7 @@ async function main() {
         medicalNotesPublic: false,
       },
     });
+    profilesCreated++;
   }
 
   // 5. Existing payments all belong to a subscription
@@ -114,9 +130,9 @@ async function main() {
 
   console.log({
     tagsGivenLegacyProduct: noProduct.count,
-    internalLabelsFromItems: tagsWithItem.length,
+    internalLabelsFromItems: itemLabels,
     claimCodesSet,
-    emergencyProfilesCreated: owners.length,
+    emergencyProfilesCreated: profilesCreated,
     paymentsMarkedSubscription: payments.count,
   });
 }

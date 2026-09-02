@@ -31,7 +31,6 @@ enum TagStatus {
 
 enum ContactMode {
   RELAY // finder sends a message through the platform; phone/email never shown
-  MASKED_PHONE // legacy — removed in migration M3
   DIRECT_CALL // click-to-call a public/forwarding number the owner set
 }
 
@@ -111,7 +110,6 @@ model User {
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
-  items            Item[]
   tags             Tag[]
   subscriptions    Subscription[]
   sessions         Session[]
@@ -295,54 +293,30 @@ model Payment {
   @@index([subscriptionId])
 }
 
-// --- Legacy belongings model (removed in migration M3) ------------------
-
-model Item {
-  id        String   @id @default(cuid())
-  userId    String
-  label     String
-  category  String
-  photoUrl  String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tags Tag[]
-
-  @@index([userId])
-}
-
 // --- Physical QR tags --------------------------------------------------
 
 model Tag {
-  id                String      @id @default(cuid())
-  shortCode         String      @unique
-  claimCode         String      @unique
-  productId         String?
-  batchId           String?
-  orderItemId       String?
-  userId            String?
-  itemId            String?
-  internalLabel     String?
-  status            TagStatus   @default(UNASSIGNED)
-  contactMode       ContactMode @default(RELAY)
-  publicDisplayName String?
-  publicMessage     String?
-  maskedPhone       String?
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
+  id            String    @id @default(cuid())
+  shortCode     String    @unique
+  claimCode     String    @unique
+  productId     String?
+  batchId       String?
+  orderItemId   String?
+  userId        String?
+  internalLabel String?
+  status        TagStatus @default(UNASSIGNED)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   product       Product?       @relation(fields: [productId], references: [id])
   batch         TagBatch?      @relation(fields: [batchId], references: [id])
   orderItem     OrderItem?     @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
   user          User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
-  item          Item?          @relation(fields: [itemId], references: [id], onDelete: SetNull)
   scanEvents    ScanEvent[]
   relayMessages RelayMessage[]
   abuseReports  AbuseReport[]
 
   @@index([userId])
-  @@index([itemId])
   @@index([productId])
   @@index([orderItemId])
   @@index([status])
