@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+// --- Auth --------------------------------------------------------------
+
 export const signupSchema = z.object({
   name: z.string().min(2, "Name is too short").max(100),
   email: z
@@ -8,7 +10,6 @@ export const signupSchema = z.object({
     .transform((v) => v.trim().toLowerCase()),
   phone: z.string().min(6).max(20).optional().or(z.literal("")),
   password: z.string().min(8, "Password must be at least 8 characters"),
-  planSlug: z.string().min(1),
 });
 
 export const loginSchema = z.object({
@@ -19,22 +20,17 @@ export const loginSchema = z.object({
   password: z.string().min(1),
 });
 
-export const itemSchema = z.object({
-  label: z.string().min(2).max(100),
-  category: z.string().min(1).max(50),
-  photoUrl: z.string().url().optional().or(z.literal("")),
+// --- Customer tag management ----------------------------------------
+// Customers set an optional private nickname and flip status between the
+// owner-controlled states. Inventory states (UNASSIGNED / ALLOCATED) are
+// admin-only.
+
+export const tagCustomerUpdateSchema = z.object({
+  internalLabel: z.string().max(100).optional().nullable(),
+  status: z.enum(["ACTIVE", "LOST", "DEACTIVATED"]).optional(),
 });
 
-// Customers configure tags they already own. They cannot move a tag back to
-// UNASSIGNED — that is raw inventory state, managed by an admin.
-export const tagCustomerUpdateSchema = z.object({
-  itemId: z.string().optional().nullable(),
-  status: z.enum(["ACTIVE", "LOST", "DEACTIVATED"]).optional(),
-  contactMode: z.enum(["RELAY", "MASKED_PHONE"]).optional(),
-  publicDisplayName: z.string().max(100).optional().nullable(),
-  publicMessage: z.string().max(500).optional().nullable(),
-  maskedPhone: z.string().max(20).optional().nullable(),
-});
+// --- Finder-facing --------------------------------------------------
 
 export const relayMessageSchema = z.object({
   finderContact: z.string().min(3).max(200),
@@ -42,7 +38,109 @@ export const relayMessageSchema = z.object({
 });
 
 export const abuseReportSchema = z.object({
-  tagId: z.string().optional(),
+  shortCode: z.string().optional(),
   reason: z.string().min(2).max(100),
   details: z.string().max(1000).optional(),
+});
+
+// --- Emergency profile --------------------------------------------
+
+const BLOOD_GROUPS = ["", "A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"] as const;
+
+export const emergencyProfileSchema = z
+  .object({
+    displayName: z.string().max(100).optional().nullable(),
+    emergencyMessage: z.string().max(500).optional().nullable(),
+    bloodGroup: z.enum(BLOOD_GROUPS).optional().nullable(),
+    allergies: z.string().max(500).optional().nullable(),
+    medicalNotes: z.string().max(500).optional().nullable(),
+    contactMode: z.enum(["RELAY", "DIRECT_CALL"]),
+    phonePublic: z.string().max(20).optional().nullable(),
+  })
+  .superRefine((val, ctx) => {
+    if (val.contactMode === "DIRECT_CALL" && !val.phonePublic?.trim()) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["phonePublic"],
+        message: "A public phone number is required for click-to-call.",
+      });
+    }
+  });
+
+export const emergencyContactSchema = z.object({
+  name: z.string().min(1, "Name is required").max(80),
+  relation: z.string().max(40).optional().nullable(),
+  phone: z.string().max(20).optional().nullable(),
+  email: z.string().email().optional().or(z.literal("")).nullable(),
+  isPublic: z.boolean(),
+});
+
+// --- Privacy -----------------------------------------------------
+
+export const PRIVACY_FIELD_NAMES = [
+  "photoPublic",
+  "namePublic",
+  "messagePublic",
+  "bloodGroupPublic",
+  "allergiesPublic",
+  "medicalNotesPublic",
+  "contactsPublic",
+  "showPhone",
+] as const;
+
+export const privacyFieldSchema = z.object({
+  field: z.enum(PRIVACY_FIELD_NAMES),
+  value: z.boolean(),
+});
+
+export const privacyPresetSchema = z.object({
+  preset: z.enum(["MINIMAL", "STANDARD", "FULL"]),
+});
+
+// --- Store: checkout & claim ---------------------------------------
+
+export const checkoutSchema = z.object({
+  productSlug: z.string().min(1),
+  quantity: z.coerce.number().int().min(1).max(10),
+  shipName: z.string().max(200).optional().nullable(),
+  shipPhone: z.string().max(200).optional().nullable(),
+  shipAddress: z.string().max(200).optional().nullable(),
+  shipCity: z.string().max(200).optional().nullable(),
+  shipNote: z.string().max(200).optional().nullable(),
+});
+
+export const claimSchema = z.object({
+  code: z.string().min(1).max(40),
+});
+
+// --- Admin: products & orders -------------------------------------
+
+export const productSchema = z.object({
+  slug: z
+    .string()
+    .min(2)
+    .max(40)
+    .regex(/^[a-z0-9-]+$/, "Lowercase letters, digits and hyphens only"),
+  name: z.string().min(2).max(80),
+  tagline: z.string().min(2).max(140),
+  description: z.string().min(2).max(2000),
+  useCase: z.string().max(500).optional().nullable(),
+  priceCents: z.coerce.number().int().min(0),
+  currency: z.string().min(1).max(8).default("BDT"),
+  status: z.enum(["DRAFT", "ACTIVE", "ARCHIVED"]),
+  sortOrder: z.coerce.number().int().min(0).max(9999),
+});
+
+export const orderStatusSchema = z.object({
+  status: z.enum(["PENDING", "PAID", "CANCELLED", "REFUNDED"]),
+});
+
+export const fulfillmentStatusSchema = z.object({
+  status: z.enum(["UNFULFILLED", "PROCESSING", "SHIPPED", "DELIVERED"]),
+});
+
+export const tagBatchSchema = z.object({
+  quantity: z.coerce.number().int().min(1).max(500),
+  productId: z.string().optional().nullable(),
+  label: z.string().min(1).max(120),
 });

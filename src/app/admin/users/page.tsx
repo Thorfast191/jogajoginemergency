@@ -10,7 +10,7 @@ export default async function AdminUsersPage() {
 
   const users = await prisma.user.findMany({
     include: {
-      _count: { select: { tags: true, items: true } },
+      _count: { select: { tags: true } },
       subscriptions: { where: { status: "ACTIVE" }, include: { plan: true }, orderBy: { createdAt: "desc" } },
     },
     orderBy: [{ role: "asc" }, { createdAt: "desc" }],

@@ -1,17 +1,20 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireActiveUser } from "@/lib/session";
+import { isPremiumEnabled } from "@/lib/premium";
 import { signOutAction } from "@/app/auth-actions";
 
 export const dynamic = "force-dynamic";
 
 const links = [
   { href: "/dashboard", label: "Overview" },
-  { href: "/dashboard/items", label: "My Items" },
+  { href: "/dashboard/profile", label: "My Profile" },
+  { href: "/dashboard/privacy", label: "Privacy" },
   { href: "/dashboard/tags", label: "My Tags" },
+  { href: "/dashboard/orders", label: "Orders" },
   { href: "/dashboard/messages", label: "Messages" },
-  { href: "/dashboard/billing", label: "Billing" },
   { href: "/dashboard/settings", label: "Settings" },
+  ...(isPremiumEnabled() ? [{ href: "/dashboard/subscription", label: "Subscription" }] : []),
 ];
 
 export default async function DashboardLayout({

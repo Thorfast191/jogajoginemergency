@@ -19,42 +19,24 @@ export async function updateTagAction(
     return { error: "Not authorized." };
   }
 
-  // Ownership: the tag must belong to the authenticated customer. Never trust
-  // the tagId coming from the browser on its own.
+  // Ownership: the tag must belong to the authenticated customer.
   const tag = await prisma.tag.findFirst({ where: { id: tagId, userId: user.id } });
   if (!tag) return { error: "Tag not found." };
 
-  const itemIdRaw = formData.get("itemId");
+  const labelRaw = formData.get("internalLabel");
   const parsed = tagCustomerUpdateSchema.safeParse({
-    itemId: itemIdRaw === "" ? null : itemIdRaw,
-    status: formData.get("status"),
-    contactMode: formData.get("contactMode"),
-    publicDisplayName: formData.get("publicDisplayName") || null,
-    publicMessage: formData.get("publicMessage") || null,
-    maskedPhone: formData.get("maskedPhone") || null,
+    internalLabel: labelRaw === "" ? null : labelRaw,
+    status: formData.get("status") || undefined,
   });
-
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
-  }
-
-  // Ownership: the item being attached must also belong to this customer.
-  if (parsed.data.itemId) {
-    const item = await prisma.item.findFirst({
-      where: { id: parsed.data.itemId, userId: user.id },
-    });
-    if (!item) return { error: "Item not found." };
   }
 
   await prisma.tag.update({
     where: { id: tag.id },
     data: {
-      itemId: parsed.data.itemId ?? null,
+      internalLabel: parsed.data.internalLabel ?? null,
       status: parsed.data.status,
-      contactMode: parsed.data.contactMode,
-      publicDisplayName: parsed.data.publicDisplayName,
-      publicMessage: parsed.data.publicMessage,
-      maskedPhone: parsed.data.maskedPhone,
     },
   });
 

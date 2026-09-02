@@ -27,7 +27,7 @@ export function ReportAbuseLink({ shortCode }: { shortCode: string }) {
         await fetch("/api/abuse-reports", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ tagId: shortCode, reason }),
+          body: JSON.stringify({ shortCode, reason }),
         });
         setStatus("sent");
       }}

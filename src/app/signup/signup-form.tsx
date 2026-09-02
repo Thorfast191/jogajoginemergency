@@ -3,15 +3,14 @@
 import { useActionState } from "react";
 import { signupAction, type SignupState } from "./actions";
 
-type Plan = { id: string; slug: string; name: string; priceCents: number; currency: string };
-
 const initialState: SignupState = {};
 
-export function SignupForm({ plans, defaultPlanSlug }: { plans: Plan[]; defaultPlanSlug: string }) {
+export function SignupForm({ next }: { next?: string }) {
   const [state, formAction, pending] = useActionState(signupAction, initialState);
 
   return (
     <form action={formAction} className="space-y-4">
+      {next && <input type="hidden" name="next" value={next} />}
       <div>
         <label className="block text-sm font-medium mb-1" htmlFor="name">
           Full name
@@ -58,23 +57,6 @@ export function SignupForm({ plans, defaultPlanSlug }: { plans: Plan[]; defaultP
           className="w-full rounded-md border border-black/15 px-3 py-2"
         />
       </div>
-      <div>
-        <label className="block text-sm font-medium mb-1" htmlFor="planSlug">
-          Plan
-        </label>
-        <select
-          id="planSlug"
-          name="planSlug"
-          defaultValue={defaultPlanSlug}
-          className="w-full rounded-md border border-black/15 px-3 py-2"
-        >
-          {plans.map((p) => (
-            <option key={p.slug} value={p.slug}>
-              {p.name} — {p.currency} {(p.priceCents / 100).toLocaleString()}/yr
-            </option>
-          ))}
-        </select>
-      </div>
 
       {state.error && <p className="text-sm text-red-600">{state.error}</p>}
 
@@ -87,7 +69,7 @@ export function SignupForm({ plans, defaultPlanSlug }: { plans: Plan[]; defaultP
       </button>
 
       <p className="text-xs text-black/40 text-center">
-        Payment runs in demo mode for now — no real charge is made.
+        Your account is free. You only pay when you buy a sticker.
       </p>
     </form>
   );
