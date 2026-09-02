@@ -65,10 +65,10 @@ export default async function AdminPaymentsPage() {
             {payments.map((p) => (
               <tr key={p.id} className="border-b border-black/5 last:border-b-0 align-top">
                 <td className="py-3 px-4">
-                  {p.subscription.user.name}
-                  <div className="text-xs text-black/40">{p.subscription.user.email}</div>
+                  {p.subscription?.user.name ?? "—"}
+                  <div className="text-xs text-black/40">{p.subscription?.user.email}</div>
                 </td>
-                <td className="py-3 px-4">{p.subscription.plan.name}</td>
+                <td className="py-3 px-4">{p.subscription?.plan.name ?? "—"}</td>
                 <td className="py-3 px-4">
                   {p.currency} {(p.amountCents / 100).toLocaleString()}
                 </td>
