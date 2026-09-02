@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Jogajog Emergency — QR tags for lost items",
+  title: "Jogajog Emergency — QR stickers + emergency profile",
   description:
-    "Stick a QR code on your bag, bike, or laptop. If it's lost, whoever finds it scans the code and reaches you instantly — without ever seeing your phone number.",
+    "Buy a QR sticker for your bike, bag, helmet or car — a one-time purchase. It links to a private emergency profile you control: whoever finds your item (or reaches a first responder) sees only what you chose to share, and can contact you without your phone number.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
