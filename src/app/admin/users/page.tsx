@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAdmin } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
@@ -40,7 +41,11 @@ export default async function AdminUsersPage() {
           <tbody>
             {users.map((u) => (
               <tr key={u.id} className="border-b border-black/5 last:border-b-0">
-                <td className="py-3 px-4">{u.name}</td>
+                <td className="py-3 px-4">
+                  <Link href={`/admin/users/${u.id}`} className="text-emerald-700 hover:underline">
+                    {u.name}
+                  </Link>
+                </td>
                 <td className="py-3 px-4">{u.email}</td>
                 <td className="py-3 px-4">
                   <span
