@@ -5,6 +5,7 @@ import { AuthError } from "next-auth";
 import { signIn } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { loginSchema } from "@/lib/validations";
+import { isSafeNext } from "@/lib/nav";
 
 export type LoginState = { error?: string };
 
@@ -43,5 +44,7 @@ export async function loginAction(
     redirect("/admin");
   }
 
-  redirect("/dashboard");
+  const nextRaw = formData.get("next");
+  const next = typeof nextRaw === "string" && isSafeNext(nextRaw) ? nextRaw : "/dashboard";
+  redirect(next);
 }
