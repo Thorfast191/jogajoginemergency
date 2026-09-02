@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getAdmin } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
+import { formatPrice } from "@/lib/money";
 
 export const dynamic = "force-dynamic";
 
@@ -21,31 +22,49 @@ export default async function AdminPaymentsPage() {
           plan: { select: { name: true } },
         },
       },
+      order: {
+        select: {
+          orderNumber: true,
+          user: { select: { name: true, email: true } },
+        },
+      },
     },
     orderBy: { createdAt: "desc" },
     take: 300,
   });
 
-  const succeeded = payments
-    .filter((p) => p.status === "SUCCEEDED")
-    .reduce((sum, p) => sum + p.amountCents, 0);
+  const succeededByKind = { ORDER: 0, SUBSCRIPTION: 0 };
+  for (const p of payments) {
+    if (p.status === "SUCCEEDED") succeededByKind[p.kind] += p.amountCents;
+  }
+  const succeededTotal = succeededByKind.ORDER + succeededByKind.SUBSCRIPTION;
 
   return (
     <div>
       <h1 className="text-2xl font-bold">Payments</h1>
       <p className="mt-1 text-sm text-black/60">
-        All payment records across customers. No live gateway is wired up yet — these are{" "}
+        All order and subscription payments. No live gateway is wired up yet — these are{" "}
         <span className="font-mono">DEMO</span> records.
       </p>
 
-      <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 gap-3">
+      <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="rounded-lg border border-black/10 p-4">
-          <p className="text-xs text-black/50">Payment records</p>
+          <p className="text-xs text-black/50">Records</p>
           <p className="mt-1 text-2xl font-semibold">{payments.length}</p>
         </div>
         <div className="rounded-lg border border-black/10 p-4">
           <p className="text-xs text-black/50">Succeeded total</p>
-          <p className="mt-1 text-2xl font-semibold">BDT {(succeeded / 100).toLocaleString()}</p>
+          <p className="mt-1 text-2xl font-semibold">{formatPrice(succeededTotal, "BDT")}</p>
+        </div>
+        <div className="rounded-lg border border-black/10 p-4">
+          <p className="text-xs text-black/50">Orders</p>
+          <p className="mt-1 text-2xl font-semibold">{formatPrice(succeededByKind.ORDER, "BDT")}</p>
+        </div>
+        <div className="rounded-lg border border-black/10 p-4">
+          <p className="text-xs text-black/50">Subscriptions</p>
+          <p className="mt-1 text-2xl font-semibold">
+            {formatPrice(succeededByKind.SUBSCRIPTION, "BDT")}
+          </p>
         </div>
       </div>
 
@@ -54,7 +73,7 @@ export default async function AdminPaymentsPage() {
           <thead>
             <tr className="text-left text-black/50 border-b border-black/10">
               <th className="py-3 px-4">Customer</th>
-              <th className="py-3 px-4">Plan</th>
+              <th className="py-3 px-4">For</th>
               <th className="py-3 px-4">Amount</th>
               <th className="py-3 px-4">Provider</th>
               <th className="py-3 px-4">Status</th>
@@ -62,29 +81,34 @@ export default async function AdminPaymentsPage() {
             </tr>
           </thead>
           <tbody>
-            {payments.map((p) => (
-              <tr key={p.id} className="border-b border-black/5 last:border-b-0 align-top">
-                <td className="py-3 px-4">
-                  {p.subscription?.user.name ?? "—"}
-                  <div className="text-xs text-black/40">{p.subscription?.user.email}</div>
-                </td>
-                <td className="py-3 px-4">{p.subscription?.plan.name ?? "—"}</td>
-                <td className="py-3 px-4">
-                  {p.currency} {(p.amountCents / 100).toLocaleString()}
-                </td>
-                <td className="py-3 px-4">{p.provider}</td>
-                <td className="py-3 px-4">
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                      statusColors[p.status] ?? "bg-black/10 text-black/60"
-                    }`}
-                  >
-                    {p.status}
-                  </span>
-                </td>
-                <td className="py-3 px-4">{p.createdAt.toLocaleDateString()}</td>
-              </tr>
-            ))}
+            {payments.map((p) => {
+              const who = p.order?.user ?? p.subscription?.user;
+              const forWhat =
+                p.kind === "ORDER"
+                  ? `Order ${p.order?.orderNumber ?? "—"}`
+                  : `${p.subscription?.plan.name ?? "—"} plan`;
+              return (
+                <tr key={p.id} className="border-b border-black/5 last:border-b-0 align-top">
+                  <td className="py-3 px-4">
+                    {who?.name ?? "—"}
+                    <div className="text-xs text-black/40">{who?.email}</div>
+                  </td>
+                  <td className="py-3 px-4">{forWhat}</td>
+                  <td className="py-3 px-4">{formatPrice(p.amountCents, p.currency)}</td>
+                  <td className="py-3 px-4">{p.provider}</td>
+                  <td className="py-3 px-4">
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                        statusColors[p.status] ?? "bg-black/10 text-black/60"
+                      }`}
+                    >
+                      {p.status}
+                    </span>
+                  </td>
+                  <td className="py-3 px-4">{p.createdAt.toLocaleDateString()}</td>
+                </tr>
+              );
+            })}
             {payments.length === 0 && (
               <tr>
                 <td colSpan={6} className="py-10 px-4 text-center text-sm text-black/50">
