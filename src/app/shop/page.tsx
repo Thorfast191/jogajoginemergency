@@ -3,6 +3,8 @@ import { SiteFooter } from "@/components/site-footer";
 import { GetYourTagButton } from "@/components/get-your-tag-button";
 import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/money";
+import { EmptyState } from "@/components/ui";
+import { EmptyTags } from "@/components/illustrations";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -26,7 +28,11 @@ export default async function ShopPage() {
         </div>
 
         {products.length === 0 ? (
-          <p className="mt-16 text-center text-black/50">Products coming soon.</p>
+          <div className="mt-12 max-w-md mx-auto">
+            <EmptyState illustration={<EmptyTags />} title="Products coming soon">
+              We&apos;re getting the shop ready. Check back shortly.
+            </EmptyState>
+          </div>
         ) : (
           <div className="mt-12 grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {products.map((p) => (

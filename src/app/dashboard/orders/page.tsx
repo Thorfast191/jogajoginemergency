@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { getCustomer } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/money";
+import { EmptyState } from "@/components/ui";
+import { EmptyOrders } from "@/components/illustrations";
 
 export const dynamic = "force-dynamic";
 
@@ -25,12 +27,13 @@ export default async function OrdersPage() {
       <p className="mt-1 text-sm text-black/60">Your sticker purchases.</p>
 
       {orders.length === 0 ? (
-        <div className="mt-6 rounded-lg border border-dashed border-black/15 p-6 text-sm text-black/60">
-          No orders yet.{" "}
-          <Link href="/shop" className="text-emerald-700 hover:underline">
-            Visit the shop
-          </Link>
-          .
+        <div className="mt-6 max-w-md">
+          <EmptyState illustration={<EmptyOrders />} title="No orders yet">
+            <Link href="/shop" className="text-emerald-700 hover:underline">
+              Visit the shop
+            </Link>{" "}
+            to get your first sticker.
+          </EmptyState>
         </div>
       ) : (
         <ul className="mt-6 divide-y divide-black/10 rounded-lg border border-black/10">

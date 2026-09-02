@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { getCustomer } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
+import { MascotCheer } from "@/components/illustrations";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +28,8 @@ export default async function CheckoutSuccessPage({
 
   return (
     <div className="mx-auto max-w-xl px-4 py-16">
-      <h1 className="text-2xl font-bold">Order confirmed 🎉</h1>
+      <MascotCheer className="w-20 h-20 text-emerald-600 anim-float" />
+      <h1 className="mt-3 text-2xl font-bold">Order confirmed</h1>
       <p className="mt-1 text-sm text-black/60">
         Order <span className="font-mono">{order.orderNumber}</span> — your tags are live now.
       </p>

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getCustomer } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { generateTagQrDataUrl } from "@/lib/qr";
+import { EmptyTags } from "@/components/illustrations";
 
 const statusColors: Record<string, string> = {
   ACTIVE: "bg-emerald-100 text-emerald-700",
@@ -40,9 +41,10 @@ export default async function TagsPage() {
       </div>
 
       {tags.length === 0 ? (
-        <div className="mt-6 rounded-lg border border-dashed border-black/15 p-6 text-sm text-black/60">
-          <p>You don&apos;t have any tags yet.</p>
-          <div className="mt-3 flex gap-3">
+        <div className="mt-6 rounded-lg border border-dashed border-black/15 p-8 text-sm text-black/60 text-center">
+          <EmptyTags className="w-24 h-16 mx-auto text-black/20" />
+          <p className="mt-3 font-medium text-black/80">You don&apos;t have any tags yet.</p>
+          <div className="mt-3 flex gap-3 justify-center">
             <Link
               href="/shop"
               className="rounded-md bg-emerald-600 text-white px-4 py-2 text-sm font-medium hover:bg-emerald-700"

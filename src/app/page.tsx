@@ -2,6 +2,7 @@ import Link from "next/link";
 import { SiteNav } from "@/components/site-nav";
 import { SiteFooter } from "@/components/site-footer";
 import { GetYourTagButton } from "@/components/get-your-tag-button";
+import { MascotWave } from "@/components/illustrations";
 
 const steps = [
   {
@@ -24,7 +25,8 @@ export default function Home() {
       <SiteNav />
       <main className="flex-1">
         <section className="mx-auto max-w-6xl px-4 py-20 sm:py-28 text-center">
-          <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-balance">
+          <MascotWave className="w-24 h-24 mx-auto text-emerald-600 anim-float" />
+          <h1 className="mt-4 text-4xl sm:text-5xl font-bold tracking-tight text-balance">
             Lost items find their way home.
           </h1>
           <p className="mt-5 text-lg text-black/60 max-w-2xl mx-auto text-balance">
