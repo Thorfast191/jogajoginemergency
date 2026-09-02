@@ -23,10 +23,14 @@ function sha256(buf: Buffer): string {
   return createHash("sha256").update(buf).digest("hex");
 }
 
-async function encode(pipeline: Sharp, edge: number): Promise<ProcessedImage> {
+async function encode(
+  pipeline: Sharp,
+  edge: number,
+  { allowEnlarge = false }: { allowEnlarge?: boolean } = {},
+): Promise<ProcessedImage> {
   const out = await pipeline
     .rotate() // honour EXIF orientation before metadata is stripped
-    .resize(edge, edge, { fit: "inside", withoutEnlargement: true })
+    .resize(edge, edge, { fit: "inside", withoutEnlargement: !allowEnlarge })
     .webp({ quality: 80 })
     .toBuffer({ resolveWithObject: true });
   return {
@@ -65,5 +69,5 @@ export async function renderSvgToWebp(svg: string, size: number): Promise<Proces
   // High density so the vector rasterises larger than `size`, then `encode`
   // downscales it crisply (its withoutEnlargement guard would otherwise pin
   // the output to the SVG's nominal 72dpi pixel size).
-  return encode(sharp(Buffer.from(svg), { density: 300 }).resize(size, size), size);
+  return encode(sharp(Buffer.from(svg), { density: 300 }), size, { allowEnlarge: true });
 }
