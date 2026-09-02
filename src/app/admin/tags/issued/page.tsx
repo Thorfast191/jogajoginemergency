@@ -13,7 +13,7 @@ export default async function AdminIssuedTagsPage() {
     where: { userId: { not: null } },
     include: {
       user: { select: { name: true, email: true } },
-      item: { select: { label: true } },
+      product: { select: { name: true } },
       _count: { select: { scanEvents: true, relayMessages: true } },
     },
     orderBy: { updatedAt: "desc" },
@@ -40,7 +40,7 @@ export default async function AdminIssuedTagsPage() {
             <tr className="text-left text-black/50 border-b border-black/10">
               <th className="py-3 px-4">Short code</th>
               <th className="py-3 px-4">Owner</th>
-              <th className="py-3 px-4">Item</th>
+              <th className="py-3 px-4">Product</th>
               <th className="py-3 px-4">Scans</th>
               <th className="py-3 px-4">Messages</th>
               <th className="py-3 px-4">Status</th>
@@ -49,12 +49,16 @@ export default async function AdminIssuedTagsPage() {
           <tbody>
             {tags.map((tag) => (
               <tr key={tag.id} className="border-b border-black/5 last:border-b-0 align-top">
-                <td className="py-3 px-4 font-mono">{tag.shortCode}</td>
+                <td className="py-3 px-4 font-mono">
+                  <Link href={`/admin/tags/${tag.id}`} className="text-emerald-700 hover:underline">
+                    {tag.shortCode}
+                  </Link>
+                </td>
                 <td className="py-3 px-4">
                   <div>{tag.user?.name ?? "—"}</div>
                   <div className="text-xs text-black/40">{tag.user?.email}</div>
                 </td>
-                <td className="py-3 px-4">{tag.item?.label ?? "—"}</td>
+                <td className="py-3 px-4">{tag.product?.name ?? "—"}</td>
                 <td className="py-3 px-4">{tag._count.scanEvents}</td>
                 <td className="py-3 px-4">{tag._count.relayMessages}</td>
                 <td className="py-3 px-4">

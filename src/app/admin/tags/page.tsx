@@ -2,20 +2,35 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAdmin } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import { TagStatusSelect } from "./tag-status-select";
-import { GenerateTagsButton } from "./generate-tags-button";
+import { GenerateBatchForm } from "./generate-batch-form";
 import { AssignTagForm } from "./assign-tag-form";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminTagInventoryPage() {
-  if (!(await getAdmin())) redirect("/dashboard");
+const STATUSES = ["UNASSIGNED", "ALLOCATED", "ACTIVE", "LOST", "DEACTIVATED"] as const;
 
-  const [tags, byStatus, customers] = await Promise.all([
+export default async function AdminTagInventoryPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string; product?: string }>;
+}) {
+  if (!(await getAdmin())) redirect("/dashboard");
+  const sp = await searchParams;
+
+  const where: Prisma.TagWhereInput = {};
+  if (STATUSES.includes(sp.status as (typeof STATUSES)[number])) {
+    where.status = sp.status as (typeof STATUSES)[number];
+  }
+  if (sp.product) where.productId = sp.product;
+
+  const [tags, byStatus, customers, products] = await Promise.all([
     prisma.tag.findMany({
+      where,
       include: {
         user: { select: { name: true, email: true } },
-        item: { select: { label: true } },
+        product: { select: { name: true } },
         _count: { select: { scanEvents: true } },
       },
       orderBy: { createdAt: "desc" },
@@ -27,13 +42,15 @@ export default async function AdminTagInventoryPage() {
       select: { id: true, name: true, email: true },
       orderBy: { name: "asc" },
     }),
+    prisma.product.findMany({ orderBy: { sortOrder: "asc" }, select: { id: true, name: true } }),
   ]);
 
   const count = (s: string) => byStatus.find((g) => g.status === s)?._count._all ?? 0;
   const total = byStatus.reduce((n, g) => n + g._count._all, 0);
   const stats = [
-    { label: "Total tags", value: total },
+    { label: "Total", value: total },
     { label: "Unassigned", value: count("UNASSIGNED") },
+    { label: "Allocated", value: count("ALLOCATED") },
     { label: "Active", value: count("ACTIVE") },
     { label: "Lost", value: count("LOST") },
     { label: "Deactivated", value: count("DEACTIVATED") },
@@ -58,11 +75,11 @@ export default async function AdminTagInventoryPage() {
       </div>
 
       <div className="mt-6 space-y-4">
-        <GenerateTagsButton />
+        <GenerateBatchForm products={products} />
         <AssignTagForm customers={customers} unassignedTags={unassignedTags} />
       </div>
 
-      <div className="mt-6 grid grid-cols-2 sm:grid-cols-5 gap-3">
+      <div className="mt-6 grid grid-cols-2 sm:grid-cols-6 gap-3">
         {stats.map((s) => (
           <div key={s.label} className="rounded-lg border border-black/10 p-4">
             <p className="text-xs text-black/50">{s.label}</p>
@@ -71,13 +88,29 @@ export default async function AdminTagInventoryPage() {
         ))}
       </div>
 
-      <div className="mt-6 overflow-x-auto rounded-lg border border-black/10">
+      <div className="mt-4 flex flex-wrap gap-3 text-sm">
+        <Link href="/admin/tags" className={!sp.status && !sp.product ? "font-semibold" : "text-black/50 hover:underline"}>
+          All
+        </Link>
+        {STATUSES.map((s) => (
+          <Link
+            key={s}
+            href={`/admin/tags?status=${s}`}
+            className={sp.status === s ? "font-semibold" : "text-black/50 hover:underline"}
+          >
+            {s}
+          </Link>
+        ))}
+      </div>
+
+      <div className="mt-4 overflow-x-auto rounded-lg border border-black/10">
         <table className="w-full text-sm border-collapse">
           <thead>
             <tr className="text-left text-black/50 border-b border-black/10">
               <th className="py-3 px-4">Short code</th>
+              <th className="py-3 px-4">Product</th>
               <th className="py-3 px-4">Owner</th>
-              <th className="py-3 px-4">Item</th>
+              <th className="py-3 px-4">Label</th>
               <th className="py-3 px-4">Scans</th>
               <th className="py-3 px-4">Status</th>
             </tr>
@@ -85,7 +118,12 @@ export default async function AdminTagInventoryPage() {
           <tbody>
             {tags.map((tag) => (
               <tr key={tag.id} className="border-b border-black/5 last:border-b-0 align-top">
-                <td className="py-3 px-4 font-mono">{tag.shortCode}</td>
+                <td className="py-3 px-4 font-mono">
+                  <Link href={`/admin/tags/${tag.id}`} className="text-emerald-700 hover:underline">
+                    {tag.shortCode}
+                  </Link>
+                </td>
+                <td className="py-3 px-4">{tag.product?.name ?? "—"}</td>
                 <td className="py-3 px-4">
                   {tag.user ? (
                     <>
@@ -96,7 +134,7 @@ export default async function AdminTagInventoryPage() {
                     <span className="text-black/40">Unassigned</span>
                   )}
                 </td>
-                <td className="py-3 px-4">{tag.item?.label ?? "—"}</td>
+                <td className="py-3 px-4">{tag.internalLabel ?? "—"}</td>
                 <td className="py-3 px-4">{tag._count.scanEvents}</td>
                 <td className="py-3 px-4">
                   <TagStatusSelect tagId={tag.id} status={tag.status} />
@@ -105,8 +143,8 @@ export default async function AdminTagInventoryPage() {
             ))}
             {tags.length === 0 && (
               <tr>
-                <td colSpan={5} className="py-10 px-4 text-center text-sm text-black/50">
-                  No tags in inventory yet.
+                <td colSpan={6} className="py-10 px-4 text-center text-sm text-black/50">
+                  No tags match.
                 </td>
               </tr>
             )}

@@ -52,19 +52,18 @@ export async function setTagStatusAction(
   if (!tag) return { error: "Tag not found." };
 
   if (status === "UNASSIGNED") {
-    // Return the tag to raw inventory: drop the owner, the attached item and
-    // any owner-authored public config so a recycled tag can't leak the
-    // previous customer's scan page.
+    // Return the tag to raw inventory: drop the owner, the order link and the
+    // private nickname so a recycled tag carries nothing from its last owner.
+    // The public scan page is driven by the owner's EmergencyProfile, which a
+    // null userId already detaches.
     await prisma.tag.update({
       where: { id: tag.id },
       data: {
         status: "UNASSIGNED",
         userId: null,
         itemId: null,
-        publicDisplayName: null,
-        publicMessage: null,
-        maskedPhone: null,
-        contactMode: "RELAY",
+        orderItemId: null,
+        internalLabel: null,
       },
     });
     revalidateTagViews();
@@ -111,36 +110,15 @@ export async function assignTagAction(
   if (user.role !== "USER") return { error: "Tags can only be assigned to customer accounts." };
   if (user.status !== "ACTIVE") return { error: "That customer account is not active." };
 
-  try {
-    await prisma.$transaction(async (tx) => {
-      const subscription = await tx.subscription.findFirst({
-        where: { userId: user.id, status: "ACTIVE" },
-        orderBy: { createdAt: "desc" },
-        include: { plan: true },
-      });
-      if (!subscription) {
-        throw new Error("That customer has no active subscription.");
-      }
-
-      const ownedTags = await tx.tag.count({ where: { userId: user.id } });
-      if (ownedTags >= subscription.plan.maxTags) {
-        throw new Error(
-          `That customer is at their ${subscription.plan.name} plan limit of ${subscription.plan.maxTags} tags.`
-        );
-      }
-
-      // Guarded write: only assigns if the tag is still free. Protects
-      // against two admins assigning the same tag concurrently.
-      const claimed = await tx.tag.updateMany({
-        where: { id: tag.id, status: "UNASSIGNED", userId: null },
-        data: { userId: user.id, status: "ACTIVE" },
-      });
-      if (claimed.count !== 1) {
-        throw new Error("That tag was just assigned to someone else.");
-      }
-    });
-  } catch (err) {
-    return { error: err instanceof Error ? err.message : "Could not assign the tag." };
+  // Physical tags are no longer a subscription entitlement — an admin can hand
+  // an inventory tag to any active customer (support, comps, replacements).
+  // Guarded write protects against two admins assigning the same tag.
+  const claimed = await prisma.tag.updateMany({
+    where: { id: tag.id, status: "UNASSIGNED", userId: null },
+    data: { userId: user.id, status: "ACTIVE" },
+  });
+  if (claimed.count !== 1) {
+    return { error: "That tag was just assigned to someone else." };
   }
 
   revalidateTagViews();
