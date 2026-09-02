@@ -1,10 +1,12 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { getClientIp } from "@/lib/client-ip";
 import { hashIp } from "@/lib/hash";
 import { rateLimit } from "@/lib/rate-limit";
-import { RelayForm } from "./relay-form";
+import { buildPublicProfileView } from "@/lib/public-profile";
+import { PublicProfileCard } from "@/components/public-profile-card";
 import { ReportAbuseLink } from "./report-abuse-link";
 
 export const dynamic = "force-dynamic";
@@ -14,16 +16,22 @@ export default async function ScanPage({ params }: { params: Promise<{ shortCode
 
   const tag = await prisma.tag.findUnique({
     where: { shortCode },
-    include: { item: true, user: { select: { name: true } } },
+    include: {
+      user: {
+        include: {
+          emergencyProfile: { include: { contacts: { orderBy: { sortOrder: "asc" } } } },
+        },
+      },
+    },
   });
 
   if (!tag || tag.status === "DEACTIVATED") {
     notFound();
   }
 
+  // Scan logging — hashed IP only, rate-limited.
   const ip = await getClientIp();
   const { allowed } = rateLimit(`scan:${ip}`, { limit: 30, windowMs: 60_000 });
-
   if (allowed) {
     const h = await headers();
     await prisma.scanEvent.create({
@@ -35,60 +43,31 @@ export default async function ScanPage({ params }: { params: Promise<{ shortCode
     });
   }
 
-  if (tag.status === "UNASSIGNED") {
+  const profile = tag.user?.emergencyProfile ?? null;
+  const notReady =
+    tag.status === "UNASSIGNED" || tag.status === "ALLOCATED" || !tag.user || !profile;
+
+  if (notReady) {
     return (
       <ScanLayout>
         <div className="text-center">
-          <h1 className="text-xl font-semibold">This tag hasn&apos;t been set up yet</h1>
+          <h1 className="text-xl font-semibold">This tag isn&apos;t set up yet</h1>
           <p className="mt-2 text-sm text-black/60">
-            Its owner hasn&apos;t configured a contact page for it. If you found an item with this
-            sticker, please hold onto it — the owner will likely activate it soon.
+            Its owner hasn&apos;t added their emergency information yet. If you found an item with
+            this sticker, please hold onto it — the owner will likely activate it soon.
           </p>
         </div>
       </ScanLayout>
     );
   }
 
-  const displayName =
-    tag.publicDisplayName || tag.item?.label || (tag.user ? `${tag.user.name}'s item` : "A found item");
+  const view = buildPublicProfileView(profile, profile.contacts, {
+    lost: tag.status === "LOST",
+  });
 
   return (
     <ScanLayout>
-      {tag.status === "LOST" && (
-        <div className="mb-4 rounded-md bg-amber-100 text-amber-800 text-sm px-3 py-2 text-center font-medium">
-          The owner has marked this item as lost — thank you for helping return it!
-        </div>
-      )}
-
-      <div className="text-center">
-        {tag.item?.photoUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={tag.item.photoUrl}
-            alt={tag.item.label}
-            className="w-full max-w-xs mx-auto rounded-lg object-cover aspect-square mb-4"
-          />
-        )}
-        <h1 className="text-xl font-semibold">{displayName}</h1>
-        {tag.publicMessage && <p className="mt-2 text-sm text-black/70">{tag.publicMessage}</p>}
-      </div>
-
-      <div className="mt-8">
-        {tag.contactMode === "MASKED_PHONE" && tag.maskedPhone ? (
-          <a
-            href={`tel:${tag.maskedPhone}`}
-            className="block w-full rounded-md bg-emerald-600 text-white text-center px-4 py-3 font-medium hover:bg-emerald-700"
-          >
-            Call to return this item
-          </a>
-        ) : (
-          <RelayForm shortCode={shortCode} />
-        )}
-      </div>
-
-      <p className="mt-6 text-center text-xs text-black/40">
-        The owner&apos;s phone number and email are never shown here.
-      </p>
+      <PublicProfileCard view={view} shortCode={shortCode} />
       <div className="mt-2 text-center">
         <ReportAbuseLink shortCode={shortCode} />
       </div>
@@ -102,6 +81,11 @@ function ScanLayout({ children }: { children: React.ReactNode }) {
       <div className="w-full max-w-sm">
         <p className="text-center text-xs font-medium text-emerald-600 mb-4">JOGAJOG EMERGENCY</p>
         <div className="rounded-xl border border-black/10 bg-white p-6">{children}</div>
+        <p className="mt-4 text-center text-[11px] text-black/40">
+          <Link href="/" className="hover:underline">
+            What is Jogajog Emergency?
+          </Link>
+        </p>
       </div>
     </div>
   );

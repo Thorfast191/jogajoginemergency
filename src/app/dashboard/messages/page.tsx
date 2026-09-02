@@ -8,7 +8,7 @@ export default async function MessagesPage() {
 
   const messages = await prisma.relayMessage.findMany({
     where: { tag: { userId: user.id } },
-    include: { tag: { include: { item: true } } },
+    include: { tag: { include: { product: true } } },
     orderBy: { createdAt: "desc" },
     take: 100,
   });
@@ -25,7 +25,7 @@ export default async function MessagesPage() {
         {messages.map((m) => (
           <li key={m.id} className="rounded-lg border border-black/10 p-4">
             <div className="flex items-center justify-between text-xs text-black/50">
-              <span>{m.tag.item?.label ?? m.tag.publicDisplayName ?? `Tag ${m.tag.shortCode}`}</span>
+              <span>{m.tag.internalLabel ?? m.tag.product?.name ?? `Tag ${m.tag.shortCode}`}</span>
               <span>{m.createdAt.toLocaleString()}</span>
             </div>
             <p className="mt-2 text-sm">{m.message}</p>
