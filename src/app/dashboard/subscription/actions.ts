@@ -60,6 +60,6 @@ export async function changePlanAction(planSlug: string) {
     });
   }
 
-  revalidatePath("/dashboard/billing");
+  revalidatePath("/dashboard/subscription");
   return {};
 }

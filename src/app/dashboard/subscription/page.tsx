@@ -1,9 +1,14 @@
 import { redirect } from "next/navigation";
 import { getCustomer } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
+import { isPremiumEnabled } from "@/lib/premium";
 import { PlanPicker } from "./plan-picker";
 
-export default async function BillingPage() {
+export const dynamic = "force-dynamic";
+
+export default async function SubscriptionPage() {
+  if (!isPremiumEnabled()) redirect("/dashboard");
+
   const user = await getCustomer();
   if (!user) redirect("/login");
 
@@ -23,10 +28,10 @@ export default async function BillingPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold">Billing</h1>
+      <h1 className="text-2xl font-bold">Premium (optional)</h1>
       <p className="mt-1 text-sm text-black/60">
-        Payments run in demo mode for now — no real charge is made. A live Bangladesh payment
-        gateway (SSLCommerz/bKash) will replace this soon.
+        Your tags and emergency profile are free. A premium plan is an optional add-on for
+        extra features. Payments run in demo mode — no real charge is made.
       </p>
 
       <div className="mt-6">
