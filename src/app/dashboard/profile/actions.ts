@@ -5,6 +5,7 @@ import { requireCustomer } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { emergencyProfileSchema, emergencyContactSchema } from "@/lib/validations";
 import { PRESET_FLAGS } from "@/lib/privacy";
+import { processImage, MediaError } from "@/lib/media";
 
 const MAX_CONTACTS = 5;
 
@@ -198,4 +199,82 @@ export async function reorderContactsAction(orderedIds: string[]) {
       ),
   );
   revalidateProfileViews();
+}
+
+// --- Profile photo ---------------------------------------------------
+
+export type PhotoState = { error?: string; success?: boolean };
+
+const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
+
+export async function uploadProfilePhotoAction(
+  _prev: PhotoState,
+  formData: FormData,
+): Promise<PhotoState> {
+  let user;
+  try {
+    user = await requireCustomer();
+  } catch {
+    return { error: "Not authorized." };
+  }
+
+  const file = formData.get("photo");
+  if (!(file instanceof File) || file.size === 0) return { error: "Choose an image to upload." };
+  if (file.size > MAX_PHOTO_BYTES) return { error: "Image is larger than 5 MB." };
+
+  let processed;
+  try {
+    processed = await processImage(Buffer.from(await file.arrayBuffer()), "PROFILE_PHOTO");
+  } catch (e) {
+    return { error: e instanceof MediaError ? e.message : "Could not process that image." };
+  }
+
+  const profile = await ensureProfile(user.id);
+  const previousAssetId = profile.photoAssetId;
+
+  const asset = await prisma.mediaAsset.create({
+    data: {
+      ownerId: user.id,
+      kind: "PROFILE_PHOTO",
+      mimeType: processed.mimeType,
+      byteSize: processed.byteSize,
+      width: processed.width,
+      height: processed.height,
+      data: new Uint8Array(processed.data),
+      checksum: processed.checksum,
+    },
+  });
+
+  await prisma.emergencyProfile.update({
+    where: { userId: user.id },
+    data: { photoAssetId: asset.id },
+  });
+
+  if (previousAssetId) {
+    await prisma.mediaAsset.delete({ where: { id: previousAssetId } }).catch(() => {});
+  }
+
+  revalidateProfileViews();
+  return { success: true };
+}
+
+export async function deleteProfilePhotoAction(): Promise<PhotoState> {
+  let user;
+  try {
+    user = await requireCustomer();
+  } catch {
+    return { error: "Not authorized." };
+  }
+
+  const profile = await prisma.emergencyProfile.findUnique({ where: { userId: user.id } });
+  if (!profile?.photoAssetId) return { success: true };
+
+  await prisma.emergencyProfile.update({
+    where: { userId: user.id },
+    data: { photoAssetId: null },
+  });
+  await prisma.mediaAsset.delete({ where: { id: profile.photoAssetId } }).catch(() => {});
+
+  revalidateProfileViews();
+  return { success: true };
 }

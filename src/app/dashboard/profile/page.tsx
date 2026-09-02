@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { ensureProfile } from "./actions";
 import { ProfileForm } from "./profile-form";
 import { ContactsEditor } from "./contacts-editor";
+import { PhotoControls } from "./photo-controls";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,11 @@ export default async function ProfilePage() {
         </Link>
         .
       </p>
+
+      <div className="mt-8">
+        <h2 className="font-semibold mb-3">Photo</h2>
+        <PhotoControls photoAssetId={profile.photoAssetId} />
+      </div>
 
       <div className="mt-8">
         <ProfileForm
