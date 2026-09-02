@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { SiteNav } from "@/components/site-nav";
 import { SiteFooter } from "@/components/site-footer";
+import { GetYourTagButton } from "@/components/get-your-tag-button";
+import { MascotWave } from "@/components/illustrations";
 
 const steps = [
   {
-    title: "1. Get your tags",
-    body: "Subscribe and we generate unique QR stickers tied to your account. Stick them on your bag, bike, laptop, or car.",
+    title: "1. Get your sticker",
+    body: "Pick a QR sticker for your bike, bag, helmet, or car. One-time purchase — we ship you a unique tag linked to your account.",
   },
   {
     title: "2. Lost item gets found",
@@ -23,7 +25,8 @@ export default function Home() {
       <SiteNav />
       <main className="flex-1">
         <section className="mx-auto max-w-6xl px-4 py-20 sm:py-28 text-center">
-          <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-balance">
+          <MascotWave className="w-24 h-24 mx-auto text-emerald-600 anim-float" />
+          <h1 className="mt-4 text-4xl sm:text-5xl font-bold tracking-tight text-balance">
             Lost items find their way home.
           </h1>
           <p className="mt-5 text-lg text-black/60 max-w-2xl mx-auto text-balance">
@@ -32,17 +35,12 @@ export default function Home() {
             without ever seeing your phone number.
           </p>
           <div className="mt-8 flex items-center justify-center gap-4">
+            <GetYourTagButton>Get your tag</GetYourTagButton>
             <Link
-              href="/signup"
-              className="rounded-md bg-emerald-600 text-white px-6 py-3 font-medium hover:bg-emerald-700"
-            >
-              Get your first tag
-            </Link>
-            <Link
-              href="/pricing"
+              href="/shop"
               className="rounded-md border border-black/15 px-6 py-3 font-medium hover:bg-black/5"
             >
-              See pricing
+              Browse stickers
             </Link>
           </div>
         </section>

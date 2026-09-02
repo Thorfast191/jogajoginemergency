@@ -1,5 +1,6 @@
 // Jogajog Emergency — data model
-// QR-sticker emergency contact / lost-item recovery system
+// Physical QR-sticker store + SaaS emergency-profile platform.
+// See docs/superpowers/specs/2026-09-02-jogajog-emergency-redesign-design.md
 
 generator client {
   provider = "prisma-client-js"
@@ -21,7 +22,8 @@ enum UserStatus {
 }
 
 enum TagStatus {
-  UNASSIGNED // printed/generated, not yet claimed by an item
+  UNASSIGNED // raw inventory, no owner
+  ALLOCATED // attached to an order, not yet activated
   ACTIVE
   LOST
   DEACTIVATED
@@ -29,7 +31,7 @@ enum TagStatus {
 
 enum ContactMode {
   RELAY // finder sends a message through the platform; phone/email never shown
-  MASKED_PHONE // click-to-call via a proxy/masked number
+  DIRECT_CALL // click-to-call a public/forwarding number the owner set
 }
 
 enum SubscriptionStatus {
@@ -52,6 +54,11 @@ enum PaymentStatus {
   PENDING
 }
 
+enum PaymentKind {
+  ORDER
+  SUBSCRIPTION
+}
+
 enum AbuseReportStatus {
   OPEN
   REVIEWING
@@ -59,24 +66,59 @@ enum AbuseReportStatus {
   DISMISSED
 }
 
-model User {
-  id           String     @id @default(cuid())
-  name         String
-  email        String     @unique
-  emailVerified DateTime?
-  phone        String?
-  passwordHash String
-  role         Role       @default(USER)
-  status       UserStatus @default(ACTIVE)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
 
-  items          Item[]
-  tags           Tag[]
-  subscriptions  Subscription[]
-  sessions       Session[]
-  accounts       Account[]
-  abuseReports   AbuseReport[]  @relation("ReportedBy")
+enum OrderStatus {
+  PENDING
+  PAID
+  CANCELLED
+  REFUNDED
+}
+
+enum FulfillmentStatus {
+  UNFULFILLED
+  PROCESSING
+  SHIPPED
+  DELIVERED
+}
+
+enum VisibilityPreset {
+  MINIMAL
+  STANDARD
+  FULL
+  CUSTOM
+}
+
+enum MediaKind {
+  PROFILE_PHOTO
+  PRODUCT_IMAGE
+}
+
+model User {
+  id            String     @id @default(cuid())
+  name          String
+  email         String     @unique
+  emailVerified DateTime?
+  phone         String?
+  passwordHash  String
+  role          Role       @default(USER)
+  status        UserStatus @default(ACTIVE)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  tags             Tag[]
+  subscriptions    Subscription[]
+  sessions         Session[]
+  accounts         Account[]
+  abuseReports     AbuseReport[]     @relation("ReportedBy")
+  emergencyProfile EmergencyProfile?
+  orders           Order[]
+  mediaAssets      MediaAsset[]      @relation("MediaOwner")
+  tagBatches       TagBatch[]
 
   @@index([email])
 }
@@ -118,29 +160,31 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
+// --- Optional premium tier (dormant; gated by PREMIUM_ENABLED) -------------
+
 model SubscriptionPlan {
-  id          String   @id @default(cuid())
-  slug        String   @unique
-  name        String
-  priceCents  Int
-  currency    String   @default("BDT")
-  maxTags     Int
-  features    String[]
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  slug       String   @unique
+  name       String
+  priceCents Int
+  currency   String   @default("BDT")
+  maxTags    Int
+  features   String[]
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
 
   subscriptions Subscription[]
 }
 
 model Subscription {
-  id                 String              @id @default(cuid())
-  userId             String
-  planId             String
-  status             SubscriptionStatus  @default(ACTIVE)
-  provider           PaymentProvider     @default(DEMO)
-  currentPeriodEnd   DateTime
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
+  id               String             @id @default(cuid())
+  userId           String
+  planId           String
+  status           SubscriptionStatus @default(ACTIVE)
+  provider         PaymentProvider    @default(DEMO)
+  currentPeriodEnd DateTime
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
 
   user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   plan     SubscriptionPlan @relation(fields: [planId], references: [id])
@@ -149,9 +193,92 @@ model Subscription {
   @@index([userId])
 }
 
+// --- Physical product store ----------------------------------------------
+
+model Product {
+  id           String        @id @default(cuid())
+  slug         String        @unique
+  name         String
+  tagline      String
+  description  String
+  useCase      String?
+  priceCents   Int
+  currency     String        @default("BDT")
+  imageAssetId String?
+  status       ProductStatus @default(DRAFT)
+  sortOrder    Int           @default(0)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  imageAsset MediaAsset? @relation("ProductImage", fields: [imageAssetId], references: [id])
+  tags       Tag[]
+  orderItems OrderItem[]
+  batches    TagBatch[]
+
+  @@index([status, sortOrder])
+}
+
+model TagBatch {
+  id          String   @id @default(cuid())
+  label       String
+  productId   String?
+  quantity    Int
+  createdById String
+  createdAt   DateTime @default(now())
+
+  product   Product? @relation(fields: [productId], references: [id])
+  createdBy User     @relation(fields: [createdById], references: [id])
+  tags      Tag[]
+
+  @@index([productId])
+}
+
+model Order {
+  id                String            @id @default(cuid())
+  orderNumber       String            @unique
+  userId            String
+  status            OrderStatus       @default(PENDING)
+  fulfillmentStatus FulfillmentStatus @default(UNFULFILLED)
+  subtotalCents     Int
+  totalCents        Int
+  currency          String            @default("BDT")
+  shipName          String?
+  shipPhone         String?
+  shipAddress       String?
+  shipCity          String?
+  shipNote          String?
+  placedAt          DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  user     User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items    OrderItem[]
+  payments Payment[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+model OrderItem {
+  id             String @id @default(cuid())
+  orderId        String
+  productId      String
+  quantity       Int    @default(1)
+  unitPriceCents Int
+  currency       String @default("BDT")
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+  tags    Tag[]
+
+  @@index([orderId])
+}
+
 model Payment {
   id             String          @id @default(cuid())
-  subscriptionId String
+  kind           PaymentKind     @default(ORDER)
+  orderId        String?
+  subscriptionId String?
   amountCents    Int
   currency       String          @default("BDT")
   provider       PaymentProvider @default(DEMO)
@@ -159,58 +286,51 @@ model Payment {
   status         PaymentStatus   @default(PENDING)
   createdAt      DateTime        @default(now())
 
-  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  order        Order?        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
 
+  @@index([orderId])
   @@index([subscriptionId])
 }
 
-model Item {
-  id        String   @id @default(cuid())
-  userId    String
-  label     String
-  category  String
-  photoUrl  String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tags Tag[]
-
-  @@index([userId])
-}
+// --- Physical QR tags --------------------------------------------------
 
 model Tag {
-  id                String      @id @default(cuid())
-  shortCode         String      @unique // used in /t/[shortCode]
-  userId            String
-  itemId            String?
-  status            TagStatus   @default(UNASSIGNED)
-  contactMode       ContactMode @default(RELAY)
-  publicDisplayName String? // e.g. "Arafat's bag" — shown instead of full name
-  publicMessage     String? // owner-authored note shown on the scan page
-  maskedPhone       String? // proxy number used only when contactMode = MASKED_PHONE
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
+  id            String    @id @default(cuid())
+  shortCode     String    @unique
+  claimCode     String    @unique
+  productId     String?
+  batchId       String?
+  orderItemId   String?
+  userId        String?
+  internalLabel String?
+  status        TagStatus @default(UNASSIGNED)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  item        Item?         @relation(fields: [itemId], references: [id], onDelete: SetNull)
-  scanEvents  ScanEvent[]
+  product       Product?       @relation(fields: [productId], references: [id])
+  batch         TagBatch?      @relation(fields: [batchId], references: [id])
+  orderItem     OrderItem?     @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+  user          User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  scanEvents    ScanEvent[]
   relayMessages RelayMessage[]
   abuseReports  AbuseReport[]
 
   @@index([userId])
-  @@index([itemId])
+  @@index([productId])
+  @@index([orderItemId])
+  @@index([status])
 }
 
 model ScanEvent {
-  id          String   @id @default(cuid())
-  tagId       String
-  scannedAt   DateTime @default(now())
-  ipHash      String // hashed IP, never store raw IP
-  approxCity  String?
-  approxRegion String?
+  id            String   @id @default(cuid())
+  tagId         String
+  scannedAt     DateTime @default(now())
+  ipHash        String // hashed IP, never store raw IP
+  approxCity    String?
+  approxRegion  String?
   approxCountry String?
-  userAgent   String?
+  userAgent     String?
 
   tag Tag @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
@@ -218,11 +338,11 @@ model ScanEvent {
 }
 
 model RelayMessage {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   tagId         String
   finderContact String // email or phone the finder left for a reply
   message       String
-  createdAt     DateTime @default(now())
+  createdAt     DateTime  @default(now())
   deliveredAt   DateTime?
 
   tag Tag @relation(fields: [tagId], references: [id], onDelete: Cascade)
@@ -244,4 +364,68 @@ model AbuseReport {
   reportedBy User? @relation("ReportedBy", fields: [reportedById], references: [id], onDelete: SetNull)
 
   @@index([tagId])
+}
+
+// --- SaaS emergency profile -------------------------------------------
+
+model EmergencyProfile {
+  id                 String           @id @default(cuid())
+  userId             String           @unique
+  displayName        String?
+  photoAssetId       String?
+  bloodGroup         String?
+  allergies          String?
+  medicalNotes       String?
+  emergencyMessage   String?
+  contactMode        ContactMode      @default(RELAY)
+  phonePublic        String?
+  visibilityPreset   VisibilityPreset @default(STANDARD)
+  photoPublic        Boolean          @default(true)
+  namePublic         Boolean          @default(true)
+  messagePublic      Boolean          @default(true)
+  bloodGroupPublic   Boolean          @default(false)
+  allergiesPublic    Boolean          @default(false)
+  medicalNotesPublic Boolean          @default(false)
+  contactsPublic     Boolean          @default(true)
+  showPhone          Boolean          @default(false)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  user       User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  photoAsset MediaAsset?        @relation("ProfilePhoto", fields: [photoAssetId], references: [id])
+  contacts   EmergencyContact[]
+}
+
+model EmergencyContact {
+  id        String  @id @default(cuid())
+  profileId String
+  name      String
+  relation  String?
+  phone     String?
+  email     String?
+  isPublic  Boolean @default(true)
+  sortOrder Int     @default(0)
+
+  profile EmergencyProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId])
+}
+
+model MediaAsset {
+  id        String    @id @default(cuid())
+  ownerId   String?
+  kind      MediaKind
+  mimeType  String
+  byteSize  Int
+  width     Int?
+  height    Int?
+  data      Bytes
+  checksum  String
+  createdAt DateTime  @default(now())
+
+  owner         User?              @relation("MediaOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  profileUsages EmergencyProfile[] @relation("ProfilePhoto")
+  productUsages Product[]          @relation("ProductImage")
+
+  @@index([ownerId])
 }

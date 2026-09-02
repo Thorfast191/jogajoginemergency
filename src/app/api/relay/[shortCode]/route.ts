@@ -23,7 +23,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ shortCo
     where: { shortCode },
     include: { user: { select: { email: true } } },
   });
-  if (!tag || tag.status === "DEACTIVATED" || tag.status === "UNASSIGNED") {
+  if (!tag || !tag.user || tag.status === "DEACTIVATED" || tag.status === "UNASSIGNED") {
     return NextResponse.json({ error: "Tag not found" }, { status: 404 });
   }
 

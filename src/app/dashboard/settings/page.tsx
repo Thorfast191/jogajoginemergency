@@ -1,10 +1,12 @@
-import { auth } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import { getCustomer } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { ProfileForm, PasswordForm } from "./settings-forms";
 
 export default async function SettingsPage() {
-  const session = await auth();
-  const user = await prisma.user.findUniqueOrThrow({ where: { id: session!.user.id } });
+  const authed = await getCustomer();
+  if (!authed) redirect("/login");
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: authed.id } });
 
   return (
     <div>

@@ -1,9 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireActiveUser } from "@/lib/session";
+import { requireCustomer } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { tagUpdateSchema } from "@/lib/validations";
+import { tagCustomerUpdateSchema } from "@/lib/validations";
 
 export type TagUpdateState = { error?: string; success?: boolean };
 
@@ -12,46 +12,35 @@ export async function updateTagAction(
   _prevState: TagUpdateState,
   formData: FormData
 ): Promise<TagUpdateState> {
-  const user = await requireActiveUser();
-  if (!user) return { error: "Not authenticated." };
+  let user;
+  try {
+    user = await requireCustomer();
+  } catch {
+    return { error: "Not authorized." };
+  }
 
+  // Ownership: the tag must belong to the authenticated customer.
   const tag = await prisma.tag.findFirst({ where: { id: tagId, userId: user.id } });
   if (!tag) return { error: "Tag not found." };
 
-  const itemIdRaw = formData.get("itemId");
-  const parsed = tagUpdateSchema.safeParse({
-    itemId: itemIdRaw === "" ? null : itemIdRaw,
-    status: formData.get("status"),
-    contactMode: formData.get("contactMode"),
-    publicDisplayName: formData.get("publicDisplayName") || null,
-    publicMessage: formData.get("publicMessage") || null,
-    maskedPhone: formData.get("maskedPhone") || null,
+  const labelRaw = formData.get("internalLabel");
+  const parsed = tagCustomerUpdateSchema.safeParse({
+    internalLabel: labelRaw === "" ? null : labelRaw,
+    status: formData.get("status") || undefined,
   });
-
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
-  if (parsed.data.itemId) {
-    const item = await prisma.item.findFirst({
-      where: { id: parsed.data.itemId, userId: user.id },
-    });
-    if (!item) return { error: "Item not found." };
-  }
-
   await prisma.tag.update({
-    where: { id: tagId },
+    where: { id: tag.id },
     data: {
-      itemId: parsed.data.itemId ?? null,
+      internalLabel: parsed.data.internalLabel ?? null,
       status: parsed.data.status,
-      contactMode: parsed.data.contactMode,
-      publicDisplayName: parsed.data.publicDisplayName,
-      publicMessage: parsed.data.publicMessage,
-      maskedPhone: parsed.data.maskedPhone,
     },
   });
 
-  revalidatePath(`/dashboard/tags/${tagId}`);
+  revalidatePath(`/dashboard/tags/${tag.id}`);
   revalidatePath("/dashboard/tags");
   return { success: true };
 }

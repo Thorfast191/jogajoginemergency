@@ -18,8 +18,8 @@ export async function POST(req: Request) {
   }
 
   let tagId: string | undefined;
-  if (parsed.data.tagId) {
-    const tag = await prisma.tag.findFirst({ where: { shortCode: parsed.data.tagId } });
+  if (parsed.data.shortCode) {
+    const tag = await prisma.tag.findFirst({ where: { shortCode: parsed.data.shortCode } });
     tagId = tag?.id;
   }
 

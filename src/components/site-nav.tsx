@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { auth } from "@/lib/auth";
+import { GetYourTagButton } from "@/components/get-your-tag-button";
 
 export async function SiteNav() {
   const session = await auth();
@@ -11,8 +12,8 @@ export async function SiteNav() {
           Jogajog <span className="text-emerald-600">Emergency</span>
         </Link>
         <div className="flex items-center gap-6 text-sm">
-          <Link href="/pricing" className="hidden sm:inline hover:text-emerald-600">
-            Pricing
+          <Link href="/shop" className="hidden sm:inline hover:text-emerald-600">
+            Shop
           </Link>
           {session?.user ? (
             <Link
@@ -26,12 +27,9 @@ export async function SiteNav() {
               <Link href="/login" className="hover:text-emerald-600">
                 Log in
               </Link>
-              <Link
-                href="/signup"
-                className="rounded-md bg-emerald-600 text-white px-4 py-2 hover:bg-emerald-700"
-              >
+              <GetYourTagButton className="rounded-md bg-emerald-600 text-white px-4 py-2 hover:bg-emerald-700">
                 Get a tag
-              </Link>
+              </GetYourTagButton>
             </>
           )}
         </div>

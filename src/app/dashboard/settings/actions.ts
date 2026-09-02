@@ -2,7 +2,7 @@
 
 import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
-import { requireActiveUser } from "@/lib/session";
+import { getCustomer } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 
@@ -17,8 +17,8 @@ export async function updateProfileAction(
   _prevState: ProfileState,
   formData: FormData
 ): Promise<ProfileState> {
-  const authedUser = await requireActiveUser();
-  if (!authedUser) return { error: "Not authenticated." };
+  const authedUser = await getCustomer();
+  if (!authedUser) return { error: "Not authorized." };
 
   const parsed = profileSchema.safeParse({
     name: formData.get("name"),
@@ -46,8 +46,8 @@ export async function updatePasswordAction(
   _prevState: PasswordState,
   formData: FormData
 ): Promise<PasswordState> {
-  const authedUser = await requireActiveUser();
-  if (!authedUser) return { error: "Not authenticated." };
+  const authedUser = await getCustomer();
+  if (!authedUser) return { error: "Not authorized." };
 
   const parsed = passwordSchema.safeParse({
     currentPassword: formData.get("currentPassword"),

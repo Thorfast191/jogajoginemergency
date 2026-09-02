@@ -3,13 +3,15 @@
 import { redirect } from "next/navigation";
 import { AuthError } from "next-auth";
 import { signIn } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { loginSchema } from "@/lib/validations";
+import { isSafeNext } from "@/lib/nav";
 
 export type LoginState = { error?: string };
 
 export async function loginAction(
   _prevState: LoginState,
-  formData: FormData
+  formData: FormData,
 ): Promise<LoginState> {
   const parsed = loginSchema.safeParse({
     email: formData.get("email"),
@@ -33,5 +35,16 @@ export async function loginAction(
     throw err;
   }
 
-  redirect("/dashboard");
+  const user = await prisma.user.findUnique({
+    where: { email: parsed.data.email },
+    select: { role: true },
+  });
+
+  if (user?.role === "ADMIN") {
+    redirect("/admin");
+  }
+
+  const nextRaw = formData.get("next");
+  const next = typeof nextRaw === "string" && isSafeNext(nextRaw) ? nextRaw : "/dashboard";
+  redirect(next);
 }
