@@ -317,7 +317,7 @@ model Item {
 model Tag {
   id                String      @id @default(cuid())
   shortCode         String      @unique
-  claimCode         String?
+  claimCode         String      @unique
   productId         String?
   batchId           String?
   orderItemId       String?

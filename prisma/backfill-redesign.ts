@@ -57,11 +57,11 @@ async function main() {
     }
   }
 
-  // 3. claimCode for every tag that lacks one
-  const noCode = await prisma.tag.findMany({
-    where: { claimCode: null },
-    select: { id: true },
-  });
+  // 3. claimCode for every tag that lacks one. Raw query because after
+  //    migration M2 the column is non-null at the type level, but this
+  //    bridge script must still work on a pre-M2 database.
+  const noCode = await prisma.$queryRaw<Array<{ id: string }>>`
+    SELECT "id" FROM "Tag" WHERE "claimCode" IS NULL`;
   let claimCodesSet = 0;
   for (const t of noCode) {
     for (let attempt = 0; attempt < 5; attempt++) {

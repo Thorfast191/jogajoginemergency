@@ -10,6 +10,18 @@ export type GenerateTagsState = {
   created?: number;
 };
 
+// Inline until Phase 6 replaces this action with generateTagBatchAction,
+// which imports the shared generator from src/lib/claim-code.ts.
+const CLAIM_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTVWXYZ";
+function inlineClaimCode(): string {
+  const group = () =>
+    Array.from(
+      { length: 4 },
+      () => CLAIM_ALPHABET[Math.floor(Math.random() * CLAIM_ALPHABET.length)],
+    ).join("");
+  return `${group()}-${group()}-${group()}`;
+}
+
 // Platform QR tag inventory generation. Admin-only, role-based — this is not
 // a customer entitlement and performs no subscription check.
 export async function generateTagsAction(
@@ -36,6 +48,7 @@ export async function generateTagsAction(
         await prisma.tag.create({
           data: {
             shortCode,
+            claimCode: inlineClaimCode(),
             userId: null,
             status: "UNASSIGNED",
           },
