@@ -93,4 +93,8 @@ docker compose exec app npm run db:seed
 
 Set real values for `AUTH_SECRET`, `NEXTAUTH_URL`, `NEXT_PUBLIC_APP_URL`, and
 `IP_HASH_SALT` in `.env` before deploying — the checked-in `.env.example` values are for
-local development only.
+local development only. `PREMIUM_ENABLED` (default `0`) gates the optional
+subscription UI; leave it off unless a premium tier is launched.
+
+Image processing (profile and product images) uses `sharp`, now a direct
+dependency.
