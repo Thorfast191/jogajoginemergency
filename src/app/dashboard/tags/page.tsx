@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { auth } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import { getCustomer } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { generateTagQrDataUrl } from "@/lib/qr";
-import { CreateTagButton } from "./create-tag-button";
 
 const statusColors: Record<string, string> = {
   ACTIVE: "bg-emerald-100 text-emerald-700",
@@ -12,29 +12,43 @@ const statusColors: Record<string, string> = {
 };
 
 export default async function TagsPage() {
-  const session = await auth();
-  const tags = await prisma.tag.findMany({
-    where: { userId: session!.user.id },
-    include: { item: true },
-    orderBy: { createdAt: "desc" },
-  });
+  const user = await getCustomer();
+  if (!user) redirect("/login");
+
+  const [subscription, tags] = await Promise.all([
+    prisma.subscription.findFirst({
+      where: { userId: user.id, status: "ACTIVE" },
+      include: { plan: true },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.tag.findMany({
+      where: { userId: user.id },
+      include: { item: true },
+      orderBy: { createdAt: "desc" },
+    }),
+  ]);
 
   const qrCodes = await Promise.all(tags.map((t) => generateTagQrDataUrl(t.shortCode)));
+  const entitlement = subscription
+    ? `${tags.length} of ${subscription.plan.maxTags} tags on your ${subscription.plan.name} plan`
+    : `${tags.length} tag${tags.length === 1 ? "" : "s"}`;
 
   return (
     <div>
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Tags</h1>
-          <p className="mt-1 text-sm text-black/60">
-            Generate a QR sticker, then assign it to an item and set what finders see.
-          </p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold">My Tags</h1>
+        <p className="mt-1 text-sm text-black/60">
+          The QR tags assigned to your account. Attach one to an item and choose what finders see.
+        </p>
+        <p className="mt-1 text-xs text-black/40">{entitlement}</p>
       </div>
 
-      <div className="mt-6">
-        <CreateTagButton />
-      </div>
+      {tags.length === 0 && (
+        <div className="mt-6 rounded-lg border border-dashed border-black/15 p-6 text-sm text-black/60">
+          You don&apos;t have any tags yet. Tags are issued to your account by Jogajog based on
+          your subscription — {subscription ? "contact support if you expected one here." : "pick a plan on the Billing page to get started."}
+        </div>
+      )}
 
       <div className="mt-6 grid sm:grid-cols-2 gap-4">
         {tags.map((tag, i) => (
@@ -56,7 +70,6 @@ export default async function TagsPage() {
             </div>
           </Link>
         ))}
-        {tags.length === 0 && <p className="text-sm text-black/50">No tags yet.</p>}
       </div>
     </div>
   );

@@ -60,23 +60,23 @@ enum AbuseReportStatus {
 }
 
 model User {
-  id           String     @id @default(cuid())
-  name         String
-  email        String     @unique
+  id            String     @id @default(cuid())
+  name          String
+  email         String     @unique
   emailVerified DateTime?
-  phone        String?
-  passwordHash String
-  role         Role       @default(USER)
-  status       UserStatus @default(ACTIVE)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  phone         String?
+  passwordHash  String
+  role          Role       @default(USER)
+  status        UserStatus @default(ACTIVE)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
 
-  items          Item[]
-  tags           Tag[]
-  subscriptions  Subscription[]
-  sessions       Session[]
-  accounts       Account[]
-  abuseReports   AbuseReport[]  @relation("ReportedBy")
+  items         Item[]
+  tags          Tag[]
+  subscriptions Subscription[]
+  sessions      Session[]
+  accounts      Account[]
+  abuseReports  AbuseReport[]  @relation("ReportedBy")
 
   @@index([email])
 }
@@ -119,28 +119,28 @@ model VerificationToken {
 }
 
 model SubscriptionPlan {
-  id          String   @id @default(cuid())
-  slug        String   @unique
-  name        String
-  priceCents  Int
-  currency    String   @default("BDT")
-  maxTags     Int
-  features    String[]
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  slug       String   @unique
+  name       String
+  priceCents Int
+  currency   String   @default("BDT")
+  maxTags    Int
+  features   String[]
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
 
   subscriptions Subscription[]
 }
 
 model Subscription {
-  id                 String              @id @default(cuid())
-  userId             String
-  planId             String
-  status             SubscriptionStatus  @default(ACTIVE)
-  provider           PaymentProvider     @default(DEMO)
-  currentPeriodEnd   DateTime
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
+  id               String             @id @default(cuid())
+  userId           String
+  planId           String
+  status           SubscriptionStatus @default(ACTIVE)
+  provider         PaymentProvider    @default(DEMO)
+  currentPeriodEnd DateTime
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
 
   user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   plan     SubscriptionPlan @relation(fields: [planId], references: [id])
@@ -181,20 +181,20 @@ model Item {
 
 model Tag {
   id                String      @id @default(cuid())
-  shortCode         String      @unique // used in /t/[shortCode]
-  userId            String
+  shortCode         String      @unique
+  userId            String?
   itemId            String?
   status            TagStatus   @default(UNASSIGNED)
   contactMode       ContactMode @default(RELAY)
-  publicDisplayName String? // e.g. "Arafat's bag" — shown instead of full name
-  publicMessage     String? // owner-authored note shown on the scan page
-  maskedPhone       String? // proxy number used only when contactMode = MASKED_PHONE
+  publicDisplayName String?
+  publicMessage     String?
+  maskedPhone       String?
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
 
-  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  item        Item?         @relation(fields: [itemId], references: [id], onDelete: SetNull)
-  scanEvents  ScanEvent[]
+  user          User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  item          Item?          @relation(fields: [itemId], references: [id], onDelete: SetNull)
+  scanEvents    ScanEvent[]
   relayMessages RelayMessage[]
   abuseReports  AbuseReport[]
 
@@ -203,14 +203,14 @@ model Tag {
 }
 
 model ScanEvent {
-  id          String   @id @default(cuid())
-  tagId       String
-  scannedAt   DateTime @default(now())
-  ipHash      String // hashed IP, never store raw IP
-  approxCity  String?
-  approxRegion String?
+  id            String   @id @default(cuid())
+  tagId         String
+  scannedAt     DateTime @default(now())
+  ipHash        String // hashed IP, never store raw IP
+  approxCity    String?
+  approxRegion  String?
   approxCountry String?
-  userAgent   String?
+  userAgent     String?
 
   tag Tag @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
@@ -218,11 +218,11 @@ model ScanEvent {
 }
 
 model RelayMessage {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   tagId         String
   finderContact String // email or phone the finder left for a reply
   message       String
-  createdAt     DateTime @default(now())
+  createdAt     DateTime  @default(now())
   deliveredAt   DateTime?
 
   tag Tag @relation(fields: [tagId], references: [id], onDelete: Cascade)

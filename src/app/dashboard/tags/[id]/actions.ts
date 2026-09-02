@@ -1,9 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireActiveUser } from "@/lib/session";
+import { requireCustomer } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { tagUpdateSchema } from "@/lib/validations";
+import { tagCustomerUpdateSchema } from "@/lib/validations";
 
 export type TagUpdateState = { error?: string; success?: boolean };
 
@@ -12,14 +12,20 @@ export async function updateTagAction(
   _prevState: TagUpdateState,
   formData: FormData
 ): Promise<TagUpdateState> {
-  const user = await requireActiveUser();
-  if (!user) return { error: "Not authenticated." };
+  let user;
+  try {
+    user = await requireCustomer();
+  } catch {
+    return { error: "Not authorized." };
+  }
 
+  // Ownership: the tag must belong to the authenticated customer. Never trust
+  // the tagId coming from the browser on its own.
   const tag = await prisma.tag.findFirst({ where: { id: tagId, userId: user.id } });
   if (!tag) return { error: "Tag not found." };
 
   const itemIdRaw = formData.get("itemId");
-  const parsed = tagUpdateSchema.safeParse({
+  const parsed = tagCustomerUpdateSchema.safeParse({
     itemId: itemIdRaw === "" ? null : itemIdRaw,
     status: formData.get("status"),
     contactMode: formData.get("contactMode"),
@@ -32,6 +38,7 @@ export async function updateTagAction(
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
+  // Ownership: the item being attached must also belong to this customer.
   if (parsed.data.itemId) {
     const item = await prisma.item.findFirst({
       where: { id: parsed.data.itemId, userId: user.id },
@@ -40,7 +47,7 @@ export async function updateTagAction(
   }
 
   await prisma.tag.update({
-    where: { id: tagId },
+    where: { id: tag.id },
     data: {
       itemId: parsed.data.itemId ?? null,
       status: parsed.data.status,
@@ -51,7 +58,7 @@ export async function updateTagAction(
     },
   });
 
-  revalidatePath(`/dashboard/tags/${tagId}`);
+  revalidatePath(`/dashboard/tags/${tag.id}`);
   revalidatePath("/dashboard/tags");
   return { success: true };
 }

@@ -1,11 +1,13 @@
-import { auth } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import { getCustomer } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 
 export default async function MessagesPage() {
-  const session = await auth();
+  const user = await getCustomer();
+  if (!user) redirect("/login");
 
   const messages = await prisma.relayMessage.findMany({
-    where: { tag: { userId: session!.user.id } },
+    where: { tag: { userId: user.id } },
     include: { tag: { include: { item: true } } },
     orderBy: { createdAt: "desc" },
     take: 100,

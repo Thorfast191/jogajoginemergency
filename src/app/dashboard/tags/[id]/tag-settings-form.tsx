@@ -48,10 +48,9 @@ export function TagSettingsForm({ tag, items }: { tag: Tag; items: Item[] }) {
         <select
           id="status"
           name="status"
-          defaultValue={tag.status}
+          defaultValue={tag.status === "UNASSIGNED" ? "ACTIVE" : tag.status}
           className="w-full rounded-md border border-black/15 px-3 py-2 text-sm"
         >
-          <option value="UNASSIGNED">Unassigned</option>
           <option value="ACTIVE">Active</option>
           <option value="LOST">Lost — flag it prominently to finders</option>
           <option value="DEACTIVATED">Deactivated — hide public page</option>

@@ -49,7 +49,8 @@ export default async function ScanPage({ params }: { params: Promise<{ shortCode
     );
   }
 
-  const displayName = tag.publicDisplayName || tag.item?.label || `${tag.user.name}'s item`;
+  const displayName =
+    tag.publicDisplayName || tag.item?.label || (tag.user ? `${tag.user.name}'s item` : "A found item");
 
   return (
     <ScanLayout>

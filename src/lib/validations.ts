@@ -25,9 +25,11 @@ export const itemSchema = z.object({
   photoUrl: z.string().url().optional().or(z.literal("")),
 });
 
-export const tagUpdateSchema = z.object({
+// Customers configure tags they already own. They cannot move a tag back to
+// UNASSIGNED — that is raw inventory state, managed by an admin.
+export const tagCustomerUpdateSchema = z.object({
   itemId: z.string().optional().nullable(),
-  status: z.enum(["UNASSIGNED", "ACTIVE", "LOST", "DEACTIVATED"]).optional(),
+  status: z.enum(["ACTIVE", "LOST", "DEACTIVATED"]).optional(),
   contactMode: z.enum(["RELAY", "MASKED_PHONE"]).optional(),
   publicDisplayName: z.string().max(100).optional().nullable(),
   publicMessage: z.string().max(500).optional().nullable(),

@@ -1,12 +1,15 @@
-import { auth } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import { getCustomer } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { ItemForm } from "./item-form";
 import { ItemRow } from "./item-row";
 
 export default async function ItemsPage() {
-  const session = await auth();
+  const user = await getCustomer();
+  if (!user) redirect("/login");
+
   const items = await prisma.item.findMany({
-    where: { userId: session!.user.id },
+    where: { userId: user.id },
     include: { tags: true },
     orderBy: { createdAt: "desc" },
   });

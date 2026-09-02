@@ -1,22 +1,30 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireActiveUser } from "@/lib/session";
-import { signOutAction } from "./actions";
+import { signOutAction } from "@/app/auth-actions";
 
 export const dynamic = "force-dynamic";
 
 const links = [
   { href: "/dashboard", label: "Overview" },
-  { href: "/dashboard/items", label: "Items" },
-  { href: "/dashboard/tags", label: "Tags" },
+  { href: "/dashboard/items", label: "My Items" },
+  { href: "/dashboard/tags", label: "My Tags" },
   { href: "/dashboard/messages", label: "Messages" },
   { href: "/dashboard/billing", label: "Billing" },
   { href: "/dashboard/settings", label: "Settings" },
 ];
 
-export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default async function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const user = await requireActiveUser();
   if (!user) redirect("/login");
+
+  if (user.role !== "USER") {
+    redirect("/admin");
+  }
 
   return (
     <div className="min-h-screen flex flex-col sm:flex-row">
@@ -36,11 +44,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
           ))}
         </nav>
         <div className="sm:mt-auto flex flex-col gap-2">
-          {user.role === "ADMIN" && (
-            <Link href="/admin" className="text-sm px-3 py-2 rounded-md hover:bg-black/5">
-              Admin panel →
-            </Link>
-          )}
           <form action={signOutAction}>
             <button
               type="submit"

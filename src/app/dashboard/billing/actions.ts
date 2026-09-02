@@ -1,12 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireActiveUser } from "@/lib/session";
+import { getCustomer } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 
 export async function changePlanAction(planSlug: string) {
-  const user = await requireActiveUser();
-  if (!user) return { error: "Not authenticated." };
+  const user = await getCustomer();
+  if (!user) return { error: "Not authorized." };
 
   const plan = await prisma.subscriptionPlan.findUnique({ where: { slug: planSlug } });
   if (!plan) return { error: "Plan not found." };

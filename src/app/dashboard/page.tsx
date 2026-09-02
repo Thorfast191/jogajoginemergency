@@ -1,10 +1,12 @@
 import Link from "next/link";
-import { auth } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import { getCustomer } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 
 export default async function DashboardPage() {
-  const session = await auth();
-  const userId = session!.user.id;
+  const user = await getCustomer();
+  if (!user) redirect("/login");
+  const userId = user.id;
 
   const [subscription, tags, recentScans, recentMessages] = await Promise.all([
     prisma.subscription.findFirst({
@@ -32,7 +34,7 @@ export default async function DashboardPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold">Welcome back{session?.user?.name ? `, ${session.user.name}` : ""}</h1>
+      <h1 className="text-2xl font-bold">Welcome back{user.name ? `, ${user.name}` : ""}</h1>
 
       <div className="mt-6 grid sm:grid-cols-3 gap-4">
         <div className="rounded-lg border border-black/10 p-4">

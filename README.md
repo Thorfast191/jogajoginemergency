@@ -28,11 +28,28 @@ integration.
 - `src/app/(marketing)` (`/`, `/pricing`) — public marketing pages
 - `src/app/signup`, `src/app/login` — auth
 - `src/app/t/[shortCode]` — the public, no-login scan page a finder lands on
-- `src/app/dashboard/*` — subscriber area: items, tags (QR generation/download, public-page
-  settings, scan log), billing, account settings
-- `src/app/admin/*` — role-gated admin panel: users, tags, subscriptions, abuse reports
+- `src/app/dashboard/*` — **customer area** (subscription-based product user): overview, My
+  Items, My Tags (configure tags assigned to you — attach item, status, contact mode,
+  public page), Messages, Billing, Settings. Customers never generate raw tag inventory.
+- `src/app/admin/*` — **admin area** (platform authority, role-based, no subscription
+  required): overview, Tag Inventory (generate QR inventory, assign tags to customers),
+  Issued Tags, Users, Subscriptions, Payments, Scan Activity, Abuse Reports
+- `src/lib/session.ts` — `requireActiveUser` / `getAdmin` / `requireAdmin` /
+  `getCustomer` / `requireCustomer`; every server action and route handler authorizes
+  through these
 - `src/lib/` — Prisma client, Auth.js config, QR generation, short-code generation, IP
   hashing, in-memory rate limiter, notification stub, zod validation schemas
+
+## Tag lifecycle
+
+An admin generates inventory tags (`userId = null`, `status = UNASSIGNED`). An admin then
+assigns an unassigned tag to a customer — this checks the customer has an active
+subscription and is under their plan's `maxTags`, and flips the tag to `userId = customer`,
+`status = ACTIVE`. The customer manages their own tags from `/dashboard/tags` (mark `LOST`,
+`DEACTIVATED`, attach an item, set the public page). An admin can release a tag back to
+inventory (`status = UNASSIGNED`), which clears the owner, the attached item and all
+owner-authored public config. Customer permissions come from the subscription; admin
+permissions come from role and never require a subscription.
 
 ## Privacy & abuse-prevention notes
 

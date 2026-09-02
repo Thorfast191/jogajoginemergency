@@ -1,19 +1,21 @@
-import { auth } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import { getCustomer } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { PlanPicker } from "./plan-picker";
 
 export default async function BillingPage() {
-  const session = await auth();
+  const user = await getCustomer();
+  if (!user) redirect("/login");
 
   const [subscription, plans, payments] = await Promise.all([
     prisma.subscription.findFirst({
-      where: { userId: session!.user.id, status: "ACTIVE" },
+      where: { userId: user.id, status: "ACTIVE" },
       include: { plan: true },
       orderBy: { createdAt: "desc" },
     }),
     prisma.subscriptionPlan.findMany({ where: { isActive: true }, orderBy: { priceCents: "asc" } }),
     prisma.payment.findMany({
-      where: { subscription: { userId: session!.user.id } },
+      where: { subscription: { userId: user.id } },
       orderBy: { createdAt: "desc" },
       take: 10,
     }),

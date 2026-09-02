@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 
+// Optimistic, cookie-only checks. The real authorization is enforced
+// server-side in the layouts and in every server action / route handler
+// (see src/lib/session.ts). This just keeps users pointed at their own
+// application area:
+//   - unauthenticated        -> /login
+//   - USER hitting /admin/*   -> /dashboard
+//   - ADMIN hitting /dashboard/* -> /admin
 export default auth((req) => {
   const { pathname } = req.nextUrl;
   const isLoggedIn = !!req.auth;
@@ -18,6 +25,9 @@ export default auth((req) => {
   if (pathname.startsWith("/dashboard")) {
     if (!isLoggedIn) {
       return NextResponse.redirect(new URL("/login", req.url));
+    }
+    if (role === "ADMIN") {
+      return NextResponse.redirect(new URL("/admin", req.url));
     }
   }
 

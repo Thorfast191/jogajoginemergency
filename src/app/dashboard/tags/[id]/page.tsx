@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
-import { auth } from "@/lib/auth";
+import { notFound, redirect } from "next/navigation";
+import { getCustomer } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { generateTagQrDataUrl, tagUrl } from "@/lib/qr";
 import { summarizeUserAgent } from "@/lib/user-agent";
@@ -8,18 +8,19 @@ import { TagSettingsForm } from "./tag-settings-form";
 
 export default async function TagDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const session = await auth();
+  const user = await getCustomer();
+  if (!user) redirect("/login");
 
   const [tag, items, scans, messages] = await Promise.all([
-    prisma.tag.findFirst({ where: { id, userId: session!.user.id } }),
-    prisma.item.findMany({ where: { userId: session!.user.id }, select: { id: true, label: true } }),
+    prisma.tag.findFirst({ where: { id, userId: user.id } }),
+    prisma.item.findMany({ where: { userId: user.id }, select: { id: true, label: true } }),
     prisma.scanEvent.findMany({
-      where: { tag: { id, userId: session!.user.id } },
+      where: { tag: { id, userId: user.id } },
       orderBy: { scannedAt: "desc" },
       take: 20,
     }),
     prisma.relayMessage.findMany({
-      where: { tag: { id, userId: session!.user.id } },
+      where: { tag: { id, userId: user.id } },
       orderBy: { createdAt: "desc" },
       take: 20,
     }),

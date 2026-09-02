@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireActiveUser } from "@/lib/session";
+import { getCustomer } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { itemSchema } from "@/lib/validations";
 
@@ -11,8 +11,8 @@ export async function createItemAction(
   _prevState: ItemFormState,
   formData: FormData
 ): Promise<ItemFormState> {
-  const user = await requireActiveUser();
-  if (!user) return { error: "Not authenticated." };
+  const user = await getCustomer();
+  if (!user) return { error: "Not authorized." };
 
   const parsed = itemSchema.safeParse({
     label: formData.get("label"),
@@ -41,8 +41,8 @@ export async function updateItemAction(
   _prevState: ItemFormState,
   formData: FormData
 ): Promise<ItemFormState> {
-  const user = await requireActiveUser();
-  if (!user) return { error: "Not authenticated." };
+  const user = await getCustomer();
+  if (!user) return { error: "Not authorized." };
 
   const parsed = itemSchema.safeParse({
     label: formData.get("label"),
@@ -53,6 +53,7 @@ export async function updateItemAction(
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
+  // Ownership: scope the write to rows owned by this customer.
   const result = await prisma.item.updateMany({
     where: { id: itemId, userId: user.id },
     data: {
@@ -68,9 +69,10 @@ export async function updateItemAction(
 }
 
 export async function deleteItemAction(itemId: string) {
-  const user = await requireActiveUser();
+  const user = await getCustomer();
   if (!user) return;
 
+  // Ownership: scope the delete to rows owned by this customer.
   await prisma.item.deleteMany({ where: { id: itemId, userId: user.id } });
   revalidatePath("/dashboard/items");
 }
