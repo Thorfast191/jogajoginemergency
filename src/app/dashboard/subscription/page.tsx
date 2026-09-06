@@ -7,6 +7,7 @@ import { activeSubscriptionStatus } from "@/lib/subscription";
 import { PageHeader, Badge, Card } from "@/components/ui";
 import { MascotCheer, MascotThink } from "@/components/illustrations";
 import { subscribeAction, cancelSubscriptionAction } from "./actions";
+import { availableGateways } from "@/lib/payments/registry";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +44,7 @@ export default async function SubscriptionPage() {
   ]);
 
   const entitled = status !== null;
+  const methods = availableGateways().map((g) => ({ id: g.id, label: g.label }));
 
   return (
     <div>
@@ -141,21 +143,31 @@ If it lapses, your page goes quiet but the relay stays open, so a lost item can
                       ))}
                     </ul>
                   )}
-                  <form action={subscribeAction} className="mt-4">
-                    <input type="hidden" name="planSlug" value={plan.slug} />
-                    <button
-                      type="submit"
-                      className="w-full rounded-xl bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white transition-transform hover:scale-[1.02]"
-                    >
-                      {current ? "Renew" : entitled ? "Switch" : "Subscribe (demo)"}
-                    </button>
-                  </form>
+                  <div className="mt-4 grid gap-2">
+                    {methods.map((m) => (
+                      <form action={subscribeAction} key={m.id}>
+                        <input type="hidden" name="planSlug" value={plan.slug} />
+                        <input type="hidden" name="provider" value={m.id} />
+                        <button
+                          type="submit"
+                          className="w-full rounded-xl bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white transition-transform hover:scale-[1.02]"
+                        >
+                          {current ? "Renew" : "Subscribe"} with {m.label}
+                        </button>
+                      </form>
+                    ))}
+                    {methods.length === 0 && (
+                      <p className="text-sm text-black/50">
+                        No payment method is configured on this deployment yet.
+                      </p>
+                    )}
+                  </div>
                 </div>
               );
             })}
           </div>
           <p className="mt-3 text-xs text-black/40">
-            Payments run in demo mode — no real charge is made.
+You&apos;ll be taken to your chosen provider to pay.
           </p>
         </div>
       )}

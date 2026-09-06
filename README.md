@@ -46,9 +46,8 @@ in code or seed data; if any are ever licensed, they are added as rows.
 ## Stack
 
 Next.js 16 (App Router; the proxy file is `src/proxy.ts`) + PostgreSQL + Prisma + Auth.js
-(credentials, JWT sessions) + Tailwind v4 + `sharp`. Payments run through a `DEMO` provider
-stub pending a real Bangladesh gateway (SSLCommerz / bKash). Tests: Vitest (`npm test`) —
-security-critical pure logic only.
+(credentials, JWT sessions) + Tailwind v4 + `sharp`. Payments go through bKash, Nagad or
+SSLCommerz. Tests: Vitest (`npm test`) — security-critical pure logic only.
 
 ## Local setup
 
@@ -68,6 +67,8 @@ security-critical pure logic only.
 | `AUTH_SECRET` | Auth.js JWT signing secret (`openssl rand -base64 32`) |
 | `NEXTAUTH_URL`, `NEXT_PUBLIC_APP_URL` | App URLs |
 | `IP_HASH_SALT` | Salt for hashing scanner IPs (`src/lib/hash.ts`) |
+| `PAYMENT_MODE` | `sandbox` (default) or `live`; `live` disables the DEMO provider |
+| `BKASH_*`, `NAGAD_*`, `SSLCOMMERZ_*` | Gateway credentials — see `.env.example` |
 
 ## Project layout
 
@@ -92,6 +93,45 @@ security-critical pure logic only.
   plus the Prisma client, Auth.js config, QR + short-code generation, IP hashing, rate
   limiter, notification stub, zod schemas.
 
+## Payments
+
+Three gateways — **bKash**, **Nagad** and **SSLCommerz** — behind one interface
+(`src/lib/payments/`). A provider whose environment variables are blank is not offered at
+checkout, so a deployment can run with one, two or all three. A `DEMO` provider settles
+inline with no money for local development, and `demoEnabled()` refuses it outright when
+`PAYMENT_MODE=live`.
+
+```
+checkout ──▶ Payment(PENDING)  ──▶  gateway  ──▶  /api/payments/callback
+                                                        │
+                        verify with the provider ◀───────┘
+                                    │
+                    amount + currency match the order?
+                          │yes                  │no
+                    Order PAID              Payment FAILED
+                    QR slots granted        nothing fulfilled
+```
+
+**Nothing in a callback is treated as evidence.** All three providers redirect the customer
+back with a payload anyone could forge, so `settlePayment` always re-verifies against the
+provider's own endpoint — SSLCommerz's validation API, bKash's execute/status call, Nagad's
+verify call — and then checks the amount and currency *match the order* before fulfilling
+anything. A short payment and an overpayment are both rejected.
+
+Settlement is idempotent, because providers retry callbacks and the browser redirect races
+the server-to-server notification. `nextPaymentStatus` is the whole rule: a success is
+final and nothing downgrades it, a repeat is a no-op, and a late success after a failure is
+still honoured.
+
+Credentials live in `.env` — see `.env.example`. Nagad additionally needs the RSA key pair
+issued at merchant onboarding; either a full PEM or the bare base64 body is accepted.
+
+The gateway request/response shapes are written against each provider's published sandbox
+API but **have not been run against a live sandbox** — that needs merchant credentials.
+The settlement path around them is verified end-to-end through the DEMO provider, including
+duplicate callbacks, late failures, cancellations and a deliberately mismatched amount
+(`?demo=mismatch`).
+
 ## Cart & checkout
 
 The cart is an `httpOnly` `jj_cart` cookie holding `[{ slug, qty }]` and nothing else —
@@ -100,10 +140,12 @@ what anything costs. `parseCart` treats its input as entirely attacker-controlle
 JSON yields an empty cart, quantities are clamped, duplicate slugs merge, and the line count
 is capped.
 
-Checkout records an `ORDER` payment and marks the order `PAID`; it creates no tags, because
-a purchase grants slots rather than codes. `Order.idempotencyKey` is unique and minted
-server-side per rendered form, so a double-submit returns the original order instead of
-placing a second one.
+Checkout creates a `PENDING` order and hands the customer to their chosen gateway; it
+creates no tags, because a purchase grants slots rather than codes, and it fulfils nothing
+until the callback verifies. `Order.idempotencyKey` is unique and minted server-side per
+rendered form, so a double-submit returns the original order instead of placing a second
+one. The cart is cleared on settlement rather than on redirect, so abandoning the gateway
+leaves the basket intact.
 
 ## Tag lifecycle
 
@@ -143,9 +185,12 @@ can never reassign a tag between accounts.
 
 ## What's stubbed / next steps
 
-- **Payments** — `DEMO` provider, marked succeeded immediately, for both orders and
-  subscriptions. Implement an SSLCommerz/bKash checkout + webhook writing to the same
-  `Payment` model, and let the webhook extend `Subscription.currentPeriodEnd`.
+- **Gateway sandbox runs** — the three integrations are written to each provider's
+  published API but have not been exercised against a live sandbox; that needs merchant
+  credentials in `.env`.
+- **Concurrent gateway sessions** — each checkout submit opens one payment attempt. A
+  customer who deliberately opens two and pays both would need a refund; settlement is
+  idempotent per payment row, so the order is still only fulfilled once.
 - **Subscription renewal** — there is no billing job. `activeSubscriptionStatus` compensates
   by checking `currentPeriodEnd` as well as status, so a stale `ACTIVE` row does not entitle.
 - **Notifications** — `src/lib/notify.ts` logs to the console. Wire in email/SMS.

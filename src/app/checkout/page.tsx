@@ -5,6 +5,7 @@ import { getCustomer } from "@/lib/session";
 import { readCart, resolveCart } from "@/lib/cart-server";
 import { formatPrice } from "@/lib/money";
 import { CheckoutForm } from "./checkout-form";
+import { availableGateways } from "@/lib/payments/registry";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,8 @@ export default async function CheckoutPage() {
 
   const cart = await resolveCart(await readCart());
   if (cart.lines.length === 0) redirect("/cart");
+
+  const methods = availableGateways().map((g) => ({ id: g.id, label: g.label }));
 
   return (
     <div className="mx-auto max-w-lg px-4 py-12">
@@ -44,7 +47,7 @@ Stickers are a one-time purchase. You&apos;ll generate your QR codes straight af
         {/* Minted here rather than in the client component so server and client
             render the same value (no hydration mismatch). The page is
             force-dynamic, so every fresh visit is a genuinely new purchase. */}
-        <CheckoutForm idempotencyKey={randomUUID()} />
+        <CheckoutForm idempotencyKey={randomUUID()} methods={methods} />
       </div>
     </div>
   );

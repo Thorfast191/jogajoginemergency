@@ -1,66 +1,109 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { requireCustomer } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-
-const YEAR_MS = 365 * 24 * 60 * 60 * 1000;
+import { gatewayFor } from "@/lib/payments/registry";
+import { appUrl } from "@/lib/payments/config";
+import { GatewayError } from "@/lib/payments/types";
 
 /**
- * Start or renew a Plus subscription.
+ * Start or renew a subscription by sending the customer to a gateway.
  *
- * Payments run through the DEMO provider and are marked succeeded inline. When
- * a real gateway lands this becomes: create PENDING, redirect to the gateway,
- * and let the webhook flip status and extend currentPeriodEnd.
- *
- * Note there is no tag-count check. Tags are bought outright; a subscription
- * unlocks presentation features, never the right to own a tag.
+ * As with orders, nothing is activated here: the subscription is created (or
+ * left) inactive with a PENDING payment, and only the verified callback in
+ * src/lib/payments/settle.ts sets it ACTIVE and extends the period.
  */
 export async function subscribeAction(formData: FormData): Promise<void> {
   const user = await requireCustomer();
 
   const planSlug = String(formData.get("planSlug") ?? "");
+  const providerId = String(formData.get("provider") ?? "");
+
   const plan = await prisma.subscriptionPlan.findFirst({
     where: { slug: planSlug, isActive: true },
   });
-  if (!plan) return;
+  if (!plan) redirect("/dashboard/subscription?payment=unknown-plan");
 
-  const periodEnd = new Date(Date.now() + YEAR_MS);
-  const payment = {
-    create: {
-      amountCents: plan.priceCents,
-      currency: plan.currency,
-      provider: "DEMO" as const,
-      status: "SUCCEEDED" as const,
-      providerRef: `demo_${Date.now()}`,
-    },
-  };
+  let gateway;
+  try {
+    gateway = gatewayFor(providerId);
+  } catch {
+    redirect("/dashboard/subscription?payment=unavailable");
+  }
 
+  // Reuse the customer's subscription row across renewals so their history
+  // stays on one record; settlement is what makes it active.
   const existing = await prisma.subscription.findFirst({
     where: { userId: user.id },
     orderBy: { createdAt: "desc" },
+    select: { id: true },
   });
 
-  if (existing) {
-    await prisma.subscription.update({
-      where: { id: existing.id },
-      data: { planId: plan.id, status: "ACTIVE", currentPeriodEnd: periodEnd, payments: payment },
+  const subscription = existing
+    ? await prisma.subscription.update({
+        where: { id: existing.id },
+        data: { planId: plan.id, provider: gateway.id },
+        select: { id: true },
+      })
+    : await prisma.subscription.create({
+        data: {
+          userId: user.id,
+          planId: plan.id,
+          status: "CANCELED",
+          provider: gateway.id,
+          // Set in the past so an unpaid subscription never entitles; the
+          // callback moves it forward a year.
+          currentPeriodEnd: new Date(0),
+        },
+        select: { id: true },
+      });
+
+  const payment = await prisma.payment.create({
+    data: {
+      kind: "SUBSCRIPTION",
+      subscriptionId: subscription.id,
+      amountCents: plan.priceCents,
+      currency: plan.currency,
+      provider: gateway.id,
+      status: "PENDING",
+    },
+    select: { id: true },
+  });
+
+  let redirectUrl: string;
+  try {
+    const result = await gateway.initiate({
+      paymentId: payment.id,
+      amountCents: plan.priceCents,
+      currency: plan.currency,
+      description: `${plan.name} subscription`,
+      customer: { name: user.name, email: user.email },
+      callbackUrl: `${appUrl()}/api/payments/callback?payment=${payment.id}`,
     });
-  } else {
-    await prisma.subscription.create({
+    redirectUrl = result.redirectUrl;
+    if (result.gatewayPaymentId) {
+      await prisma.payment.update({
+        where: { id: payment.id },
+        data: { gatewayPaymentId: result.gatewayPaymentId },
+      });
+    }
+  } catch (e) {
+    await prisma.payment.update({
+      where: { id: payment.id },
       data: {
-        userId: user.id,
-        planId: plan.id,
-        status: "ACTIVE",
-        provider: "DEMO",
-        currentPeriodEnd: periodEnd,
-        payments: payment,
+        status: "FAILED",
+        failureReason: e instanceof Error ? e.message.slice(0, 200) : "Gateway error",
       },
     });
+    console.error("[subscription] gateway initiate failed:", e);
+    redirect(
+      `/dashboard/subscription?payment=${e instanceof GatewayError ? "unavailable" : "error"}`,
+    );
   }
 
-  revalidatePath("/dashboard/subscription");
-  revalidatePath("/dashboard");
+  redirect(redirectUrl);
 }
 
 /**

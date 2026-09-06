@@ -130,6 +130,7 @@ export const checkoutSchema = z.object({
   // Minted per rendered checkout form; Order.idempotencyKey is unique, so a
   // resubmit of the same form returns the original order.
   idempotencyKey: z.string().min(8).max(64),
+  provider: z.enum(["DEMO", "SSLCOMMERZ", "BKASH", "NAGAD"]),
   shipName: z.string().max(200).optional().nullable(),
   shipPhone: z.string().max(200).optional().nullable(),
   shipAddress: z.string().max(200).optional().nullable(),
