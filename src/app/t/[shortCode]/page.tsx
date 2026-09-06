@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { getClientIp } from "@/lib/client-ip";
 import { hashIp } from "@/lib/hash";
 import { rateLimit } from "@/lib/rate-limit";
+import { approxLocationFrom, formatLocation } from "@/lib/geo";
+import { notifyOwnerOfScan } from "@/lib/notify";
 import { buildPublicProfileView } from "@/lib/public-profile";
 import { resolveScanTheme, themeCssVars, type ThemeSkin } from "@/lib/themes";
 import { userIsEntitled } from "@/lib/subscription";
@@ -21,6 +23,7 @@ export default async function ScanPage({ params }: { params: Promise<{ shortCode
     where: { shortCode },
     include: {
       theme: true,
+      product: { select: { name: true } },
       user: {
         include: {
           emergencyProfile: {
@@ -42,16 +45,34 @@ export default async function ScanPage({ params }: { params: Promise<{ shortCode
   // page: the owner should see that people are scanning, since that is the
   // strongest reason to renew.
   const ip = await getClientIp();
-  const { allowed } = rateLimit(`scan:${ip}`, { limit: 30, windowMs: 60_000 });
+  const { allowed } = await rateLimit(`scan:${ip}`, { limit: 30, windowMs: 60_000 });
   if (allowed) {
     const h = await headers();
+    const location = approxLocationFrom(h);
+    const scannedAt = new Date();
     await prisma.scanEvent.create({
       data: {
         tagId: tag.id,
         ipHash: hashIp(ip),
         userAgent: h.get("user-agent")?.slice(0, 300),
+        ...location,
       },
     });
+
+    // Tell the owner — but at most once every ten minutes per tag, so someone
+    // refreshing the page does not fill an inbox. Failures are swallowed: a
+    // finder must never see an error because our mail host is down.
+    const notifiable = await rateLimit(`scan-notify:${tag.id}`, { limit: 1, windowMs: 10 * 60_000 });
+    if (notifiable.allowed && tag.user.notifyOnScan) {
+      await notifyOwnerOfScan({
+        userId: tag.userId,
+        ownerEmail: tag.user.email,
+        tagId: tag.id,
+        tagLabel: tag.internalLabel ?? tag.product?.name ?? `/t/${shortCode}`,
+        scannedAt,
+        approxLocation: formatLocation(location),
+      }).catch(() => {});
+    }
   }
 
   const skin = resolveScanTheme(tag.theme as ThemeSkin | null);

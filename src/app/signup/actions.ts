@@ -34,7 +34,7 @@ export async function signupAction(
   }
 
   const ip = await getClientIp();
-  if (!recordHit(`signup:${ip}`, SIGNUP_LIMIT).allowed) {
+  if (!(await recordHit(`signup:${ip}`, SIGNUP_LIMIT)).allowed) {
     return { error: "Too many sign-ups from this connection. Please try again later." };
   }
 

@@ -99,6 +99,19 @@ enum MediaKind {
   THEME_ART
 }
 
+enum NotificationKind {
+  SCAN
+  RELAY_MESSAGE
+  PASSWORD_RESET
+  SUBSCRIPTION_EXPIRING
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
 model User {
   id                String     @id @default(cuid())
   name              String
@@ -111,6 +124,8 @@ model User {
   // Sessions are JWTs and cannot be deleted server-side. Stamping this on a
   // password reset lets requireActiveUser reject tokens minted before it.
   passwordChangedAt DateTime?
+  // Whether to email this owner when one of their tags is scanned.
+  notifyOnScan      Boolean    @default(true)
   createdAt         DateTime   @default(now())
   updatedAt         DateTime   @updatedAt
 
@@ -121,6 +136,7 @@ model User {
   abuseReports     AbuseReport[]     @relation("ReportedBy")
   emergencyProfile EmergencyProfile?
   orders           Order[]
+  notifications    NotificationLog[]
   mediaAssets      MediaAsset[]      @relation("MediaOwner")
 
   @@index([email])
@@ -474,6 +490,38 @@ model EmergencyContact {
   profile EmergencyProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
 
   @@index([profileId])
+}
+
+// An outbox, not just a log. Every message is written here first and marked
+// SENT only once the transport accepts it, so a failed send is visible and
+// retryable rather than lost in a console.
+model NotificationLog {
+  id        String             @id @default(cuid())
+  kind      NotificationKind
+  toEmail   String
+  subject   String
+  status    NotificationStatus @default(PENDING)
+  error     String?
+  userId    String?
+  createdAt DateTime           @default(now())
+  sentAt    DateTime?
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([userId])
+}
+
+// Backing store for the shared rate limiter. Only used when
+// RATE_LIMIT_STORE=postgres; a single-process deployment stays in memory.
+// Fixed-window counters: one row per key per window, upserted on each hit.
+model RateLimitCounter {
+  key         String
+  windowStart DateTime
+  count       Int      @default(0)
+
+  @@id([key, windowStart])
+  @@index([windowStart])
 }
 
 model MediaAsset {

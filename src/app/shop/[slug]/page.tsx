@@ -31,10 +31,10 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
             style={theme ? (themeCssVars(theme) as React.CSSProperties) : undefined}
             className="overflow-hidden rounded-2xl border border-black/10 bg-[var(--skin-bg,#f7f7f7)]"
           >
-            {product.imageAssetId ? (
+            {product.imageAssetId || product.theme?.artAssetId ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={`/media/${product.imageAssetId}`}
+                src={`/media/${product.imageAssetId ?? product.theme?.artAssetId}`}
                 alt={product.name}
                 className="aspect-square w-full object-cover"
               />

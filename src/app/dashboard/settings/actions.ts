@@ -2,7 +2,7 @@
 
 import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
-import { getCustomer } from "@/lib/session";
+import { getCustomer, requireCustomer } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 
@@ -65,4 +65,15 @@ export async function updatePasswordAction(
   await prisma.user.update({ where: { id: user.id }, data: { passwordHash } });
 
   return { success: true };
+}
+
+/** Turn scan emails on or off. Off is a preference, not a privacy control —
+ *  scans are still recorded and shown in the dashboard either way. */
+export async function setScanEmailsAction(formData: FormData): Promise<void> {
+  const user = await requireCustomer();
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { notifyOnScan: formData.get("enabled") === "on" },
+  });
+  revalidatePath("/dashboard/settings");
 }

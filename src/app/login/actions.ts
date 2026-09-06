@@ -39,7 +39,7 @@ export async function loginAction(
   const emailKey = `login-email:${parsed.data.email}`;
   const ipKey = `login-ip:${await getClientIp()}`;
 
-  if (!checkLimit(emailKey, EMAIL_LIMIT).allowed || !checkLimit(ipKey, IP_LIMIT).allowed) {
+  if (!(await checkLimit(emailKey, EMAIL_LIMIT)).allowed || !(await checkLimit(ipKey, IP_LIMIT)).allowed) {
     return { error: THROTTLED };
   }
 
@@ -51,8 +51,8 @@ export async function loginAction(
     });
   } catch (err) {
     if (err instanceof AuthError) {
-      recordHit(emailKey, EMAIL_LIMIT);
-      recordHit(ipKey, IP_LIMIT);
+      await recordHit(emailKey, EMAIL_LIMIT);
+      await recordHit(ipKey, IP_LIMIT);
       return { error: BAD_CREDENTIALS };
     }
     throw err;

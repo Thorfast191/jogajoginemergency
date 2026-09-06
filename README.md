@@ -69,6 +69,9 @@ SSLCommerz. Tests: Vitest (`npm test`) — security-critical pure logic only.
 | `IP_HASH_SALT` | Salt for hashing scanner IPs (`src/lib/hash.ts`) |
 | `PAYMENT_MODE` | `sandbox` (default) or `live`; `live` disables the DEMO provider |
 | `BKASH_*`, `NAGAD_*`, `SSLCOMMERZ_*` | Gateway credentials — see `.env.example` |
+| `SMTP_*`, `MAIL_FROM` | Outgoing mail; without these nothing is delivered |
+| `MAINTENANCE_SECRET` | Bearer token for `/api/maintenance`; unset means it 404s |
+| `RATE_LIMIT_STORE` | `postgres` to share rate limits across instances |
 
 ## Project layout
 
@@ -132,6 +135,52 @@ The settlement path around them is verified end-to-end through the DEMO provider
 duplicate callbacks, late failures, cancellations and a deliberately mismatched amount
 (`?demo=mismatch`).
 
+## Notifications
+
+Email goes out through SMTP (`SMTP_*` in `.env`). Without those variables the app still
+runs and prints what it would have sent, but **nothing reaches anyone** — including the
+messages finders leave for owners, which is the core loop. Configure mail before launch.
+
+Every message is written to a `NotificationLog` outbox *before* it is sent and marked `SENT`
+only once the transport accepts it, so a delivery failure is visible and retryable rather
+than lost in a console. Sending never throws to the caller: a finder pressing "send" must
+not see an error because our mail host is down — their message is already saved.
+
+Bodies are built by pure functions in `src/lib/notify/render.ts`. Two of them carry text a
+stranger typed straight into the owner's inbox, and mail clients render HTML, so everything
+interpolated is escaped — with a test asserting no tag from a hostile message survives as a
+tag. The finder's contact is deliberately kept out of the subject line, because subjects
+appear in lock-screen previews.
+
+Scan emails are throttled to one per tag per ten minutes and can be turned off per account
+in Settings. Turning them off is a preference, not a privacy control: scans are still
+recorded and shown in the dashboard.
+
+## Scan location
+
+`ScanEvent.approx*` is filled from the geolocation headers a CDN or reverse proxy already
+adds (Cloudflare, Vercel, or a generic `x-geo-*`). Nothing is looked up and no IP is stored
+— behind no proxy, as in local development, the columns stay null and the UI says "Unknown
+location".
+
+## Operations
+
+`GET|POST /api/maintenance` with `Authorization: Bearer $MAINTENANCE_SECRET` does the
+housekeeping there is no scheduler for: warns subscribers 7 days, 1 day and 0 days from
+expiry, prunes stale rate-limit counters, and drops notification rows older than 90 days
+(failures are kept). It is idempotent — running it twice in a day sends nothing twice — and
+404s without a valid token. Wire it to cron or a systemd timer:
+
+```
+0 9 * * *  curl -fsS -H "Authorization: Bearer $MAINTENANCE_SECRET" https://…/api/maintenance
+```
+
+`RATE_LIMIT_STORE=postgres` moves rate-limit budgets into the database so several instances
+share one. Leave it unset for a single-process deployment, where the in-memory limiter is
+exact and costs nothing. The Postgres backend is a fixed window rather than a sliding one:
+one upsert per hit instead of a row per hit, at the price of allowing up to twice the limit
+across a window boundary — fine for throttling, wrong for anything that must be exact.
+
 ## Cart & checkout
 
 The cart is an `httpOnly` `jj_cart` cookie holding `[{ slug, qty }]` and nothing else —
@@ -177,9 +226,9 @@ can never reassign a tag between accounts.
   loose because mobile carriers here NAT heavily. Signup is 5/hour per IP.
 - A password reset stamps `User.passwordChangedAt`, and `requireActiveUser` rejects tokens
   minted before it, so a reset revokes outstanding JWT sessions.
-- `src/lib/rate-limit.ts` is an **in-memory** limiter — correct for a single-process VPS.
-  Swap it for a shared store before running multiple instances; it now guards credentials, so
-  a second instance would give an attacker double the budget.
+- `src/lib/rate-limit.ts` is in-memory by default and correct for a single process. Set
+  `RATE_LIMIT_STORE=postgres` before running multiple instances — these limits guard
+  credentials, and per-process budgets would give an attacker N times the attempts.
 - Short codes: 8 chars from an unambiguous 56-char alphabet, retried against the unique
   index on collision (`src/lib/tag.ts`).
 
@@ -193,10 +242,8 @@ can never reassign a tag between accounts.
   idempotent per payment row, so the order is still only fulfilled once.
 - **Subscription renewal** — there is no billing job. `activeSubscriptionStatus` compensates
   by checking `currentPeriodEnd` as well as status, so a stale `ACTIVE` row does not entitle.
-- **Notifications** — `src/lib/notify.ts` logs to the console. Wire in email/SMS.
-- **Scan geolocation** — `ScanEvent.approx*` columns exist but nothing populates them.
-- **Theme artwork** — `Theme.artAssetId` exists; the admin form does not upload to it yet, and
-  the store falls back to the product image.
+- **SMS** — everything is email. A Bangladeshi audience may expect SMS for scan alerts;
+  `src/lib/notify/transport.ts` is the one place a second channel would go.
 - **Fulfilment** — `Order` has minimal nullable shipping fields and a `fulfillmentStatus`
   enum; no carrier integration.
 

@@ -9,19 +9,22 @@ export async function POST(req: Request, { params }: { params: Promise<{ shortCo
   const { shortCode } = await params;
   const ip = await getClientIp();
 
-  const { allowed } = rateLimit(`relay:${ip}`, { limit: 5, windowMs: 5 * 60_000 });
+  const { allowed } = await rateLimit(`relay:${ip}`, { limit: 5, windowMs: 5 * 60_000 });
   if (!allowed) {
     return NextResponse.json({ error: "Too many messages sent. Try again later." }, { status: 429 });
   }
 
-  const tagLimit = rateLimit(`relay-tag:${shortCode}`, { limit: 10, windowMs: 5 * 60_000 });
+  const tagLimit = await rateLimit(`relay-tag:${shortCode}`, { limit: 10, windowMs: 5 * 60_000 });
   if (!tagLimit.allowed) {
     return NextResponse.json({ error: "Too many messages sent for this tag. Try again later." }, { status: 429 });
   }
 
   const tag = await prisma.tag.findUnique({
     where: { shortCode },
-    include: { user: { select: { email: true } } },
+    include: {
+      user: { select: { id: true, email: true } },
+      product: { select: { name: true } },
+    },
   });
   if (!tag || !tag.user || tag.status === "DEACTIVATED") {
     return NextResponse.json({ error: "Tag not found" }, { status: 404 });
@@ -41,12 +44,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ shortCo
     },
   });
 
+  // The message is already saved, so a mail failure must not fail the request:
+  // the finder did their part and should be thanked either way.
   await notifyOwnerOfRelayMessage({
+    userId: tag.user.id,
     ownerEmail: tag.user.email,
-    tagShortCode: shortCode,
+    tagLabel: tag.internalLabel ?? tag.product?.name ?? `/t/${shortCode}`,
     finderContact: parsed.data.finderContact,
     message: parsed.data.message,
-  });
+  }).catch(() => {});
 
   return NextResponse.json({ ok: true });
 }

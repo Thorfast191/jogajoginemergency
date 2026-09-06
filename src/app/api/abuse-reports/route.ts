@@ -6,7 +6,7 @@ import { rateLimit } from "@/lib/rate-limit";
 
 export async function POST(req: Request) {
   const ip = await getClientIp();
-  const { allowed } = rateLimit(`abuse-report:${ip}`, { limit: 5, windowMs: 10 * 60_000 });
+  const { allowed } = await rateLimit(`abuse-report:${ip}`, { limit: 5, windowMs: 10 * 60_000 });
   if (!allowed) {
     return NextResponse.json({ error: "Too many reports. Try again later." }, { status: 429 });
   }

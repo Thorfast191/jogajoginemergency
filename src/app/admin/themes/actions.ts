@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { themeSchema } from "@/lib/validations";
+import { processImage, MediaError } from "@/lib/media";
 
 export type ThemeState = { error?: string; success?: boolean };
 
@@ -75,4 +76,54 @@ export async function archiveThemeAction(id: string): Promise<void> {
   await requireAdmin();
   await prisma.theme.update({ where: { id }, data: { status: "ARCHIVED" } });
   revalidate();
+}
+
+/**
+ * Upload the artwork printed on a sticker in this theme.
+ *
+ * The old asset is deleted only after the theme points at the new one, so a
+ * failure part-way leaves a theme with working art rather than none.
+ */
+export async function uploadThemeArtAction(
+  id: string,
+  _prev: ThemeState,
+  formData: FormData,
+): Promise<ThemeState> {
+  await requireAdmin();
+
+  const file = formData.get("art");
+  if (!(file instanceof File) || file.size === 0) return { error: "Choose an image." };
+  if (file.size > 5 * 1024 * 1024) return { error: "Image is larger than 5 MB." };
+
+  const theme = await prisma.theme.findUnique({ where: { id }, select: { artAssetId: true } });
+  if (!theme) return { error: "Theme not found." };
+
+  let processed;
+  try {
+    processed = await processImage(Buffer.from(await file.arrayBuffer()), "PRODUCT_IMAGE");
+  } catch (e) {
+    return { error: e instanceof MediaError ? e.message : "Could not process that image." };
+  }
+
+  const asset = await prisma.mediaAsset.create({
+    data: {
+      ownerId: null,
+      kind: "THEME_ART",
+      mimeType: processed.mimeType,
+      byteSize: processed.byteSize,
+      width: processed.width,
+      height: processed.height,
+      data: new Uint8Array(processed.data),
+      checksum: processed.checksum,
+    },
+  });
+
+  await prisma.theme.update({ where: { id }, data: { artAssetId: asset.id } });
+  if (theme.artAssetId) {
+    await prisma.mediaAsset.delete({ where: { id: theme.artAssetId } }).catch(() => {});
+  }
+
+  revalidate();
+  revalidatePath(`/admin/themes/${id}`);
+  return { success: true };
 }

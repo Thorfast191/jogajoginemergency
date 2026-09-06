@@ -5,6 +5,7 @@ import { themeCssVars, type ThemeSkin } from "@/lib/themes";
 import { ThemeMascot } from "@/components/illustrations";
 import { ThemeForm } from "../theme-form";
 import { ArchiveThemeButton } from "./archive-button";
+import { ThemeArtUpload } from "./art-upload";
 
 export const dynamic = "force-dynamic";
 
@@ -37,8 +38,12 @@ export default async function AdminThemeDetailPage({
         <ThemeMascot mascot={theme.mascot} className="h-24 w-24 text-[var(--skin-accent)] anim-float" />
       </div>
 
-      <div className="mt-6">
+      <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_20rem]">
         <ThemeForm theme={theme} />
+        <div>
+          <h2 className="mb-3 font-semibold">Sticker artwork</h2>
+          <ThemeArtUpload themeId={theme.id} artAssetId={theme.artAssetId} />
+        </div>
       </div>
 
       {theme.status !== "ARCHIVED" && (

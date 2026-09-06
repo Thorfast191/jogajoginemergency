@@ -42,10 +42,10 @@ Each sticker is a one-time purchase and comes with a QR code you generate
                 className="flex flex-col overflow-hidden rounded-2xl border border-black/10 bg-white hover-lift"
               >
                 <Link href={`/shop/${p.slug}`} className="block bg-black/[0.03]">
-                  {p.imageAssetId ? (
+                  {p.imageAssetId || p.theme?.artAssetId ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={`/media/${p.imageAssetId}`}
+                      src={`/media/${p.imageAssetId ?? p.theme?.artAssetId}`}
                       alt={p.name}
                       className="aspect-square w-full object-cover"
                     />

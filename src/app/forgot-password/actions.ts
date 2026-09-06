@@ -24,7 +24,7 @@ export async function forgotPasswordAction(
   if (!parsed.success) return { error: "Enter a valid email." };
 
   const ip = await getClientIp();
-  const { allowed } = rateLimit(`forgot-password:${ip}`, { limit: 5, windowMs: 15 * 60_000 });
+  const { allowed } = await rateLimit(`forgot-password:${ip}`, { limit: 5, windowMs: 15 * 60_000 });
   if (!allowed) return { error: "Too many attempts. Try again later." };
 
   const user = await prisma.user.findUnique({ where: { email: parsed.data.email } });
