@@ -66,7 +66,10 @@ export default async function ScanPage({ params }: { params: Promise<{ shortCode
     return (
       <ScanLayout skin={skin}>
         <div className="text-center">
-          <ThemeMascot mascot={skin.mascot} className="w-20 h-20 mx-auto anim-float" />
+          <ThemeMascot
+            mascot={skin.mascot}
+            className="mx-auto h-20 w-20 text-[var(--skin-accent)] anim-float"
+          />
           <h1 className="mt-3 text-xl font-semibold">This tag isn&apos;t set up yet</h1>
           <p className="mt-2 text-sm opacity-60">
             Its owner hasn&apos;t added their emergency information yet. If you found an item with

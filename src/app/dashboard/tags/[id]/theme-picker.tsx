@@ -33,12 +33,20 @@ export function ThemePicker({
         {themes.map((theme) => {
           const locked = theme.tier === "PREMIUM" && !entitled;
           const current = theme.id === currentThemeId;
+          // A premium skin bought with the sticker stays selected while the
+          // owner is on the free plan — but the scan page renders the default.
+          // Saying only "Current" here would be a lie about what finders see.
+          const currentButInactive = current && locked;
           return (
             <div
               key={theme.id}
               style={themeCssVars(theme) as React.CSSProperties}
               className={`overflow-hidden rounded-xl border-2 ${
-                current ? "border-[var(--color-primary)]" : "border-black/10"
+                currentButInactive
+                  ? "border-violet-400"
+                  : current
+                    ? "border-[var(--color-primary)]"
+                    : "border-black/10"
               }`}
             >
               <div className="grid h-20 place-items-center bg-[var(--skin-bg)]">
@@ -52,7 +60,14 @@ export function ThemePicker({
                   <span className="truncate text-xs font-semibold">{theme.name}</span>
                   {theme.tier === "PREMIUM" && <Badge tone="grape">Plus</Badge>}
                 </div>
-                {current ? (
+                {currentButInactive ? (
+                  <Link
+                    href="/dashboard/subscription"
+                    className="mt-1 block text-center text-xs font-medium text-violet-700 hover:underline"
+                  >
+                    Not shown — unlock
+                  </Link>
+                ) : current ? (
                   <p className="mt-1 text-center text-xs font-semibold text-[var(--color-primary)]">
                     Current
                   </p>

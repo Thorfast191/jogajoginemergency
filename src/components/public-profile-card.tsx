@@ -5,9 +5,11 @@ import { ThemeMascot } from "@/components/illustrations";
 // Presentational only. Every visible field has already been vetted by
 // buildPublicProfileView — this component must not receive a raw profile.
 //
-// A theme may recolour the frame around this card, but the emergency block
-// below keeps fixed high-contrast colours. Someone is reading this on a
-// stranger's phone, possibly in a hurry: legibility is not themeable.
+// A theme recolours this card, but never at the cost of reading it. Every
+// colour here comes from the --skin-* tokens, which themeCssVars has already
+// forced to meet WCAG contrast against the card's own surface. Someone may be
+// reading this on a stranger's phone to find a blood group: legibility is not
+// negotiable, whatever the skin says.
 export function PublicProfileCard({
   view,
   shortCode,
@@ -25,7 +27,7 @@ export function PublicProfileCard({
   const hasMedical = medical.some(([, v]) => v);
 
   return (
-    <div className="text-black">
+    <div className="text-[var(--skin-ink)]">
       {view.lost && (
         <div className="mb-4 rounded-lg bg-amber-100 text-amber-900 text-sm px-3 py-2 text-center font-medium">
           The owner has marked this as lost — thank you for helping return it!
@@ -41,26 +43,26 @@ export function PublicProfileCard({
             className="w-24 h-24 rounded-full object-cover mx-auto mb-3 ring-4 ring-[var(--skin-accent)]/20"
           />
         ) : (
-          <ThemeMascot mascot={mascot} className="w-20 h-20 mx-auto mb-2" />
+          <ThemeMascot mascot={mascot} className="mx-auto mb-2 h-20 w-20 text-[var(--skin-accent)]" />
         )}
         <h1 className="text-xl font-bold">{view.displayName}</h1>
-        {view.bio && <p className="mt-1 text-sm text-black/60">{view.bio}</p>}
+        {view.bio && <p className="mt-1 text-sm text-[var(--skin-muted)]">{view.bio}</p>}
       </div>
 
-      <p className="mt-5 text-center text-xs font-semibold uppercase tracking-wide text-black/40">
+      <p className="mt-5 text-center text-xs font-semibold uppercase tracking-wide text-[var(--skin-muted)]">
         Emergency information
       </p>
 
       {view.emergencyMessage && (
-        <p className="mt-2 text-center text-sm text-black/70">{view.emergencyMessage}</p>
+        <p className="mt-2 text-center text-sm text-[var(--skin-ink)]">{view.emergencyMessage}</p>
       )}
 
       {hasMedical && (
-        <dl className="mt-4 rounded-xl border border-black/10 divide-y divide-black/10 text-sm">
+        <dl className="mt-4 rounded-xl border border-[var(--skin-line)] divide-y divide-[var(--skin-line)] text-sm">
           {medical.map(([label, value]) =>
             value ? (
               <div key={label} className="flex justify-between gap-3 px-3 py-2">
-                <dt className="text-black/50">{label}</dt>
+                <dt className="text-[var(--skin-muted)]">{label}</dt>
                 <dd className="text-right font-semibold">{value}</dd>
               </div>
             ) : null,
@@ -83,15 +85,15 @@ export function PublicProfileCard({
 
       {view.contacts.length > 0 && (
         <div className="mt-6">
-          <p className="text-xs font-semibold uppercase tracking-wide text-black/40">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--skin-muted)]">
             Emergency contacts
           </p>
           <ul className="mt-2 space-y-2">
             {view.contacts.map((c, i) => (
-              <li key={i} className="rounded-xl border border-black/10 px-3 py-2 text-sm">
+              <li key={i} className="rounded-xl border border-[var(--skin-line)] px-3 py-2 text-sm">
                 <p className="font-semibold">
                   {c.name}
-                  {c.relation ? <span className="font-normal text-black/50"> · {c.relation}</span> : null}
+                  {c.relation ? <span className="font-normal text-[var(--skin-muted)]"> · {c.relation}</span> : null}
                 </p>
                 <div className="mt-1 flex gap-3 text-xs">
                   {c.phone && (
@@ -113,7 +115,7 @@ export function PublicProfileCard({
 
       {view.links.length > 0 && (
         <div className="mt-6">
-          <p className="text-xs font-semibold uppercase tracking-wide text-black/40">Links</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--skin-muted)]">Links</p>
           <ul className="mt-2 flex flex-wrap gap-2">
             {view.links.map((l, i) => (
               <li key={i}>
@@ -121,7 +123,7 @@ export function PublicProfileCard({
                   href={l.url}
                   target="_blank"
                   rel="noopener noreferrer nofollow"
-                  className="inline-block rounded-full border border-black/15 px-3 py-1 text-xs font-medium hover:border-[var(--skin-accent)] hover:text-[var(--skin-accent)]"
+                  className="inline-block rounded-full border border-[var(--skin-line)] px-3 py-1 text-xs font-medium hover:border-[var(--skin-accent)] hover:text-[var(--skin-accent)]"
                 >
                   {l.label}
                 </a>
@@ -131,7 +133,7 @@ export function PublicProfileCard({
         </div>
       )}
 
-      <p className="mt-6 text-center text-xs text-black/40">
+      <p className="mt-6 text-center text-xs text-[var(--skin-muted)]">
         The owner&apos;s account details are never shown unless they chose to share them.
       </p>
     </div>

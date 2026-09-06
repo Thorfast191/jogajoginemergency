@@ -37,7 +37,7 @@ export function ReportAbuseLink({ shortCode }: { shortCode: string }) {
         value={reason}
         onChange={(e) => setReason(e.target.value)}
         required
-        className="rounded-md border border-black/15 px-2 py-1 text-xs"
+        className="rounded-md border border-[var(--skin-line)] bg-[var(--skin-surface)] px-2 py-1 text-xs text-[var(--skin-ink)]"
       >
         <option value="">Select a reason…</option>
         <option value="spam">Spam or scam</option>

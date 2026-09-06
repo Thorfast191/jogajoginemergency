@@ -47,7 +47,7 @@ export function RelayForm({ shortCode }: { shortCode: string }) {
           required
           value={finderContact}
           onChange={(e) => setFinderContact(e.target.value)}
-          className="w-full rounded-md border border-black/15 px-3 py-2 text-sm"
+          className="w-full rounded-lg border border-[var(--skin-line)] bg-[var(--skin-surface)] px-3 py-2 text-sm text-[var(--skin-ink)]"
         />
       </div>
       <div>
@@ -61,14 +61,14 @@ export function RelayForm({ shortCode }: { shortCode: string }) {
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           placeholder="e.g. I found your bag at Dhaka airport, gate 3."
-          className="w-full rounded-md border border-black/15 px-3 py-2 text-sm"
+          className="w-full rounded-lg border border-[var(--skin-line)] bg-[var(--skin-surface)] px-3 py-2 text-sm text-[var(--skin-ink)]"
         />
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}
       <button
         type="submit"
         disabled={status === "sending"}
-        className="w-full rounded-md bg-emerald-600 text-white px-4 py-3 font-medium hover:bg-emerald-700 disabled:opacity-60"
+        className="w-full rounded-xl bg-[var(--skin-accent)] px-4 py-3 font-semibold text-[var(--skin-on-accent)] transition-transform hover:scale-[1.02] active:scale-[0.99] disabled:opacity-60 disabled:hover:scale-100"
       >
         {status === "sending" ? "Sending…" : "Send message to owner"}
       </button>

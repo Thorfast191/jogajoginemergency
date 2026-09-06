@@ -167,6 +167,15 @@ async function main() {
     },
   });
 
+  // Retire the pre-Plus tiers. They are deactivated rather than deleted
+  // because existing Subscription rows still reference them, and they
+  // advertised features (email/SMS scan notifications) that do not exist.
+  const retired = await prisma.subscriptionPlan.updateMany({
+    where: { slug: { not: "plus" }, isActive: true },
+    data: { isActive: false },
+  });
+  if (retired.count > 0) console.log(`Retired ${retired.count} legacy plan(s).`);
+
   for (const t of THEMES) {
     await prisma.theme.upsert({
       where: { slug: t.slug },
