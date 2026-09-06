@@ -22,7 +22,7 @@ export default async function CheckoutPage() {
       </Link>
       <h1 className="mt-2 text-3xl font-bold">Checkout</h1>
       <p className="mt-1 text-sm text-black/60">
-        Stickers are a one-time purchase. Your emergency profile is free forever.
+Stickers are a one-time purchase. You&apos;ll generate your QR codes straight after.
       </p>
 
       <ul className="mt-6 divide-y divide-black/10 rounded-2xl border border-black/10 bg-white">

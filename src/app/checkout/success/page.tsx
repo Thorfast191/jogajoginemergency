@@ -51,7 +51,7 @@ export default async function CheckoutSuccessPage({
             <li key={t.id} className="rounded-lg border border-black/10 p-3 text-sm flex justify-between">
               <span className="font-mono">/t/{t.shortCode}</span>
               <span className="text-black/50">
-                claim code <span className="font-mono">{t.claimCode}</span>
+                claim code <span className="font-mono"></span>
               </span>
             </li>
           ))}

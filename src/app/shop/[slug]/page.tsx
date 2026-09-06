@@ -54,14 +54,9 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
 
             {theme && (
               <p className="mt-3 flex items-center gap-2">
-                <Badge tone={theme.tier === "PREMIUM" ? "grape" : "neutral"}>
+                <Badge tone="neutral">
                   {theme.name} theme
                 </Badge>
-                {theme.tier === "PREMIUM" && (
-                  <span className="text-xs text-black/50">
-                    Premium skin — needs Plus to use on your scan page
-                  </span>
-                )}
               </p>
             )}
 

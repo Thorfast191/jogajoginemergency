@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { setTagStatusAction } from "../actions";
 
-const statuses = ["UNASSIGNED", "ACTIVE", "LOST", "DEACTIVATED"] as const;
+const statuses = ["ACTIVE", "LOST", "DEACTIVATED"] as const;
 
 function Select({ tagId, status }: { tagId: string; status: string }) {
   const [pending, startTransition] = useTransition();

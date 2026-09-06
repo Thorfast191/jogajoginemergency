@@ -30,7 +30,7 @@ export function PortfolioVisibility({
       <p className="mt-1 text-sm text-black/60">
         {entitled
           ? "The optional half of your scan page."
-          : "Saved, but not published until you're on Plus."}
+          : "Saved, but nothing publishes until your page is live."}
       </p>
 
       <ul className="mt-3 divide-y divide-black/10 rounded-xl border border-black/10 bg-white">
@@ -63,7 +63,7 @@ export function PortfolioVisibility({
       {!entitled && (
         <p className="mt-2 text-xs text-violet-800">
           <Link href="/dashboard/subscription" className="font-semibold hover:underline">
-            Plus publishes your portfolio →
+Subscribe to publish your page →
           </Link>
         </p>
       )}

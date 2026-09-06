@@ -176,7 +176,6 @@ export const themeSchema = z.object({
     .regex(/^[a-z0-9-]+$/, "Lowercase letters, digits and hyphens only"),
   name: z.string().min(2).max(60),
   tagline: z.string().min(2).max(140),
-  tier: z.enum(["FREE", "PREMIUM"]),
   bgColor: hexColor("#FBF9F6"),
   surfaceColor: hexColor("#FFFFFF"),
   inkColor: hexColor("#171717"),

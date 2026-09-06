@@ -1,13 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { entitlementsFor, isEntitled, FREE_SCAN_HISTORY } from "../entitlements";
+import { isEntitled, LAPSED_BEHAVIOUR } from "../entitlements";
 
-describe("entitlementsFor", () => {
-  it("entitles an active subscriber to everything paid", () => {
-    expect(entitlementsFor("ACTIVE")).toEqual({
-      portfolio: true,
-      premiumThemes: true,
-      fullScanHistory: true,
-    });
+describe("isEntitled", () => {
+  it("entitles an active subscriber", () => {
+    expect(isEntitled("ACTIVE")).toBe(true);
   });
 
   it("entitles a trialing subscriber", () => {
@@ -17,15 +13,14 @@ describe("entitlementsFor", () => {
   it("does not entitle past-due, canceled, or absent subscriptions", () => {
     for (const s of ["PAST_DUE", "CANCELED", null, undefined] as const) {
       expect(isEntitled(s)).toBe(false);
-      expect(entitlementsFor(s)).toEqual({
-        portfolio: false,
-        premiumThemes: false,
-        fullScanHistory: false,
-      });
     }
   });
+});
 
-  it("caps free scan history at a small, useful number", () => {
-    expect(FREE_SCAN_HISTORY).toBe(5);
+describe("LAPSED_BEHAVIOUR", () => {
+  it("keeps the relay open so a found item can still be returned", () => {
+    // Changing this constant changes what a stranger sees standing over
+    // someone's lost helmet. It is deliberately a single named switch.
+    expect(LAPSED_BEHAVIOUR).toBe("RELAY_ONLY");
   });
 });

@@ -31,7 +31,7 @@ const contact = {
 
 describe("buildPublicProfileView", () => {
   it("hides everything when all flags are false", () => {
-    const v = buildPublicProfileView(base, [contact], [], { lost: false, entitled: false });
+    const v = buildPublicProfileView(base, [contact], [], { lost: false, entitled: true });
     expect(v.displayName).toBe("Someone's belongings");
     expect(v.photoUrl).toBeNull();
     expect(v.hasPhoto).toBe(false);
@@ -44,7 +44,7 @@ describe("buildPublicProfileView", () => {
   });
 
   it("never leaks the real name when namePublic is false", () => {
-    const v = buildPublicProfileView({ ...base, messagePublic: true }, [], [], { lost: false, entitled: false });
+    const v = buildPublicProfileView({ ...base, messagePublic: true }, [], [], { lost: false, entitled: true });
     expect(JSON.stringify(v)).not.toContain("Arafat");
   });
 
@@ -53,7 +53,7 @@ describe("buildPublicProfileView", () => {
       { ...base, namePublic: true, photoPublic: true, bloodGroupPublic: true },
       [],
       [],
-      { lost: true, entitled: false },
+      { lost: true, entitled: true },
     );
     expect(v.displayName).toBe("Arafat Islam");
     expect(v.photoUrl).toBe("/media/media1");
@@ -65,10 +65,10 @@ describe("buildPublicProfileView", () => {
 
   it("phonePublic requires showPhone AND DIRECT_CALL", () => {
     expect(
-      buildPublicProfileView({ ...base, showPhone: true, contactMode: "RELAY" }, [], [], { lost: false, entitled: false }).phonePublic,
+      buildPublicProfileView({ ...base, showPhone: true, contactMode: "RELAY" }, [], [], { lost: false, entitled: true }).phonePublic,
     ).toBeNull();
     expect(
-      buildPublicProfileView({ ...base, showPhone: true, contactMode: "DIRECT_CALL" }, [], [], { lost: false, entitled: false })
+      buildPublicProfileView({ ...base, showPhone: true, contactMode: "DIRECT_CALL" }, [], [], { lost: false, entitled: true })
         .phonePublic,
     ).toBe("+880123");
   });
@@ -78,7 +78,7 @@ describe("buildPublicProfileView", () => {
       { ...base, contactsPublic: true },
       [contact, { ...contact, name: "Secret", isPublic: false }],
       [],
-      { lost: false, entitled: false },
+      { lost: false, entitled: true },
     );
     expect(v.contacts.map((c) => c.name)).toEqual(["Rahim"]);
   });
@@ -91,15 +91,17 @@ describe("buildPublicProfileView", () => {
         { ...contact, name: "First", sortOrder: 1 },
       ],
       [],
-      { lost: false, entitled: false },
+      { lost: false, entitled: true },
     );
     expect(v.contacts.map((c) => c.name)).toEqual(["First", "Second"]);
   });
 
   it("emits a fixed key set with no account internals", () => {
-    const v = buildPublicProfileView(base, [], [], { lost: false, entitled: false });
+    const v = buildPublicProfileView(base, [], [], { lost: false, entitled: true });
     expect(Object.keys(v).sort()).toEqual(
       [
+        "active",
+        "relayOpen",
         "allergies",
         "bio",
         "bloodGroup",
@@ -195,9 +197,10 @@ describe("buildPublicProfileView — link URLs are attacker-influenced", () => {
   });
 });
 
-describe("the safety invariant: a lapsed subscription never hides medical data", () => {
+describe("a lapsed subscription closes the page", () => {
   const everythingPublic = {
     ...base,
+    bio: "Designer in Dhaka",
     bloodGroupPublic: true,
     allergiesPublic: true,
     medicalNotesPublic: true,
@@ -205,31 +208,72 @@ describe("the safety invariant: a lapsed subscription never hides medical data",
     namePublic: true,
     photoPublic: true,
     contactsPublic: true,
+    bioPublic: true,
+    linksPublic: true,
   };
 
-  it("publishes every emergency field with no subscription at all", () => {
-    const v = buildPublicProfileView(everythingPublic, [contact], [], {
+  const dormant = () =>
+    buildPublicProfileView(everythingPublic, [contact], [link], {
       lost: false,
       entitled: false,
     });
-    expect(v.bloodGroup).toBe("O+");
-    expect(v.allergies).toBe("penicillin");
-    expect(v.medicalNotes).toBe("asthma");
-    expect(v.emergencyMessage).toBe("Please call my brother");
-    expect(v.displayName).toBe("Arafat Islam");
-    expect(v.photoUrl).toBe("/media/media1");
-    expect(v.contacts).toHaveLength(1);
+
+  it("marks the view inactive", () => {
+    expect(dormant().active).toBe(false);
   });
 
-  it("returns identical emergency fields entitled and unentitled", () => {
-    const free = buildPublicProfileView(everythingPublic, [contact], [], { lost: false, entitled: false });
-    const paid = buildPublicProfileView(everythingPublic, [contact], [], { lost: false, entitled: true });
-    const emergencyOnly = (v: typeof free) => {
-      const copy: Record<string, unknown> = { ...v };
-      delete copy.bio;
-      delete copy.links;
-      return copy;
-    };
-    expect(emergencyOnly(free)).toEqual(emergencyOnly(paid));
+  it("withholds every field the owner had published", () => {
+    const v = dormant();
+    expect(v.displayName).toBe("Someone's belongings");
+    expect(v.photoUrl).toBeNull();
+    expect(v.hasPhoto).toBe(false);
+    expect(v.emergencyMessage).toBeNull();
+    expect(v.bloodGroup).toBeNull();
+    expect(v.allergies).toBeNull();
+    expect(v.medicalNotes).toBeNull();
+    expect(v.phonePublic).toBeNull();
+    expect(v.bio).toBeNull();
+    expect(v.contacts).toEqual([]);
+    expect(v.links).toEqual([]);
+  });
+
+  it("leaks nothing through any string value in the view", () => {
+    const serialised = JSON.stringify(dormant());
+    for (const secret of [
+      "Arafat Islam",
+      "O+",
+      "penicillin",
+      "asthma",
+      "Rahim",
+      "+880999",
+      "+880123",
+      "media1",
+      "Designer in Dhaka",
+      "example.com",
+    ]) {
+      expect(serialised).not.toContain(secret);
+    }
+  });
+
+  it("keeps the relay open so a found item can still be returned", () => {
+    expect(dormant().relayOpen).toBe(true);
+    expect(dormant().contactMode).toBe("RELAY");
+  });
+
+  it("still reports a lost flag, which is not owner information", () => {
+    const v = buildPublicProfileView(everythingPublic, [], [], { lost: true, entitled: false });
+    expect(v.lost).toBe(true);
+  });
+
+  it("publishes everything again once the subscription is active", () => {
+    const live = buildPublicProfileView(everythingPublic, [contact], [link], {
+      lost: false,
+      entitled: true,
+    });
+    expect(live.active).toBe(true);
+    expect(live.bloodGroup).toBe("O+");
+    expect(live.displayName).toBe("Arafat Islam");
+    expect(live.contacts).toHaveLength(1);
+    expect(live.links).toHaveLength(1);
   });
 });

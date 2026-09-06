@@ -2,7 +2,6 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { themeCssVars, type ThemeSkin } from "@/lib/themes";
 import { ThemeMascot } from "@/components/illustrations";
-import { Badge } from "@/components/ui";
 import { ThemeForm } from "./theme-form";
 
 export const dynamic = "force-dynamic";
@@ -33,7 +32,7 @@ export default async function AdminThemesPage() {
             <div className="p-3">
               <div className="flex items-center justify-between gap-2">
                 <p className="font-semibold">{t.name}</p>
-                <Badge tone={t.tier === "PREMIUM" ? "grape" : "neutral"}>{t.tier}</Badge>
+                
               </div>
               <p className="mt-0.5 font-mono text-xs text-black/40">{t.slug}</p>
               <p className="mt-1 text-xs text-black/50">

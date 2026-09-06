@@ -4,8 +4,6 @@ import { revalidatePath } from "next/cache";
 import { requireCustomer } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { tagCustomerUpdateSchema } from "@/lib/validations";
-import { canSelectTheme } from "@/lib/themes";
-import { userIsEntitled } from "@/lib/subscription";
 
 export type TagUpdateState = { error?: string; success?: boolean };
 
@@ -48,11 +46,8 @@ export async function updateTagAction(
 }
 
 /**
- * Re-skin a tag's scan page.
- *
- * Two gates, both server-side: the tag must belong to the caller, and a
- * PREMIUM theme requires a live subscription. The picker hides locked themes,
- * but the picker is not the enforcement.
+ * Re-skin a tag's scan page. Ownership is the only gate — themes are cosmetic,
+ * and a subscription already pays for the page they appear on.
  */
 export async function setTagThemeAction(formData: FormData): Promise<void> {
   const user = await requireCustomer();
@@ -67,10 +62,9 @@ export async function setTagThemeAction(formData: FormData): Promise<void> {
   if (themeId) {
     const theme = await prisma.theme.findFirst({
       where: { id: themeId, status: "ACTIVE" },
-      select: { tier: true },
+      select: { id: true },
     });
     if (!theme) return;
-    if (!canSelectTheme(theme, await userIsEntitled(user.id))) return;
   }
 
   await prisma.tag.update({ where: { id: tag.id }, data: { themeId } });

@@ -1,10 +1,16 @@
 // The single source of truth for what the public scan page (and the dashboard
 // privacy preview) may show. Nothing else builds a "public" view of a profile.
 //
+// Two gates, in order. First the subscription: without one the page is dormant
+// and nothing about the owner is returned at all. Then, for a live page, the
+// owner's per-field visibility flags.
+//
 // It takes the full profile + contacts and returns a plain DTO containing ONLY
 // the fields whose visibility flag is set. The owner's real name, account
 // phone, and any non-public medical data never enter the returned object — not
 // as a value, not as a key.
+
+import { LAPSED_BEHAVIOUR } from "./entitlements";
 
 export type ContactMode = "RELAY" | "DIRECT_CALL";
 
@@ -56,6 +62,10 @@ export type PublicContact = {
 };
 
 export type PublicProfileView = {
+  /** False when the owner has no active subscription — the page is dormant. */
+  active: boolean;
+  /** Whether a finder may still send a message through the relay. */
+  relayOpen: boolean;
   lost: boolean;
   displayName: string;
   hasPhoto: boolean;
@@ -94,6 +104,29 @@ export function buildPublicProfileView(
 ): PublicProfileView {
   const contactMode: ContactMode = profile.contactMode === "DIRECT_CALL" ? "DIRECT_CALL" : "RELAY";
 
+  // No active subscription: the page is dormant. Every field is withheld — not
+  // as a value, not as a key that happens to be null on a populated view — and
+  // only the anonymous relay remains, so a found item can still get home.
+  if (!opts.entitled) {
+    return {
+      active: false,
+      relayOpen: LAPSED_BEHAVIOUR === "RELAY_ONLY",
+      lost: opts.lost,
+      displayName: ANON_NAME,
+      hasPhoto: false,
+      photoUrl: null,
+      emergencyMessage: null,
+      bloodGroup: null,
+      allergies: null,
+      medicalNotes: null,
+      contactMode: "RELAY",
+      phonePublic: null,
+      contacts: [],
+      bio: null,
+      links: [],
+    };
+  }
+
   const displayName =
     profile.namePublic && profile.displayName ? profile.displayName : ANON_NAME;
 
@@ -107,11 +140,8 @@ export function buildPublicProfileView(
         .map((c) => ({ name: c.name, relation: c.relation, phone: c.phone, email: c.email }))
     : [];
 
-  // The portfolio layer is the only part of this view a subscription gates.
-  // Everything below it — name, photo, message, medical fields, contacts — is
-  // free forever, so a lapsed card never hides anything a responder needs.
   const publicLinks: PublicLink[] =
-    opts.entitled && profile.linksPublic !== false
+    profile.linksPublic !== false
       ? [...links]
           .filter((l) => l.isPublic && isSafeLinkUrl(l.url))
           .sort((a, b) => a.sortOrder - b.sortOrder)
@@ -119,6 +149,8 @@ export function buildPublicProfileView(
       : [];
 
   return {
+    active: true,
+    relayOpen: true,
     lost: opts.lost,
     displayName,
     hasPhoto: photoUrl !== null,
@@ -131,7 +163,7 @@ export function buildPublicProfileView(
     phonePublic:
       profile.showPhone && contactMode === "DIRECT_CALL" ? profile.phonePublic : null,
     contacts: publicContacts,
-    bio: opts.entitled && profile.bioPublic ? (profile.bio ?? null) : null,
+    bio: profile.bioPublic ? (profile.bio ?? null) : null,
     links: publicLinks,
   };
 }

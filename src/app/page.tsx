@@ -8,7 +8,7 @@ const steps = [
   {
     icon: MascotWave,
     title: "Get your sticker",
-    body: "Pick a QR sticker for your bike, bag, helmet or car — in whichever theme you like. One-time purchase, shipped with a unique tag.",
+    body: "Pick a sticker for your bike, bag, helmet or car — in whichever theme you like. One-time purchase, shipped to you.",
   },
   {
     icon: MascotSearch,
@@ -34,8 +34,8 @@ const promises = [
     tone: "text-[var(--color-sky)]",
   },
   {
-    title: "Medical info is always free",
-    body: "Emergency details never sit behind a paywall. If your subscription lapses, a responder still sees your blood group.",
+    title: "You generate the code",
+    body: "Your QR is made in your own dashboard and bound to your profile — nobody printed it before you decided what it says.",
     tone: "text-[var(--color-berry)]",
   },
   {

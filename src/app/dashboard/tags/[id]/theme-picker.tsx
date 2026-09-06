@@ -1,26 +1,21 @@
 import { themeCssVars, type ThemeSkin } from "@/lib/themes";
 import { ThemeMascot } from "@/components/illustrations";
-import { Badge } from "@/components/ui";
 import { setTagThemeAction } from "./actions";
-import Link from "next/link";
 
 type Option = ThemeSkin & { id: string };
 
 /**
- * Skin picker for one tag. Locked (premium) themes are still shown — seeing
- * what Plus unlocks is the point — but their button is replaced by an upgrade
- * link. The server action re-checks entitlement regardless.
+ * Skin picker for one tag. Themes are cosmetic — the subscription already pays
+ * for the page itself — so every theme is selectable.
  */
 export function ThemePicker({
   tagId,
   themes,
   currentThemeId,
-  entitled,
 }: {
   tagId: string;
   themes: Option[];
   currentThemeId: string | null;
-  entitled: boolean;
 }) {
   return (
     <div>
@@ -31,53 +26,24 @@ export function ThemePicker({
 
       <div className="mt-3 grid grid-cols-2 gap-3">
         {themes.map((theme) => {
-          const locked = theme.tier === "PREMIUM" && !entitled;
           const current = theme.id === currentThemeId;
-          // A premium skin bought with the sticker stays selected while the
-          // owner is on the free plan — but the scan page renders the default.
-          // Saying only "Current" here would be a lie about what finders see.
-          const currentButInactive = current && locked;
           return (
             <div
               key={theme.id}
               style={themeCssVars(theme) as React.CSSProperties}
               className={`overflow-hidden rounded-xl border-2 ${
-                currentButInactive
-                  ? "border-violet-400"
-                  : current
-                    ? "border-[var(--color-primary)]"
-                    : "border-black/10"
+                current ? "border-[var(--color-primary)]" : "border-black/10"
               }`}
             >
               <div className="grid h-20 place-items-center bg-[var(--skin-bg)]">
-                <ThemeMascot
-                  mascot={theme.mascot}
-                  className={`h-12 w-12 text-[var(--skin-accent)] ${locked ? "opacity-40" : ""}`}
-                />
+                <ThemeMascot mascot={theme.mascot} className="h-12 w-12 text-[var(--skin-accent)]" />
               </div>
               <div className="bg-white p-2">
-                <div className="flex items-center justify-between gap-1">
-                  <span className="truncate text-xs font-semibold">{theme.name}</span>
-                  {theme.tier === "PREMIUM" && <Badge tone="grape">Plus</Badge>}
-                </div>
-                {currentButInactive ? (
-                  <Link
-                    href="/dashboard/subscription"
-                    className="mt-1 block text-center text-xs font-medium text-violet-700 hover:underline"
-                  >
-                    Not shown — unlock
-                  </Link>
-                ) : current ? (
+                <span className="block truncate text-xs font-semibold">{theme.name}</span>
+                {current ? (
                   <p className="mt-1 text-center text-xs font-semibold text-[var(--color-primary)]">
                     Current
                   </p>
-                ) : locked ? (
-                  <Link
-                    href="/dashboard/subscription"
-                    className="mt-1 block text-center text-xs font-medium text-violet-700 hover:underline"
-                  >
-                    Unlock
-                  </Link>
                 ) : (
                   <form action={setTagThemeAction}>
                     <input type="hidden" name="tagId" value={tagId} />

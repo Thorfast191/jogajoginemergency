@@ -51,9 +51,7 @@ export default async function AdminOrderDetailPage({
                 {item.tags.map((t) => (
                   <li key={t.id} className="flex justify-between font-mono text-xs">
                     <span>/t/{t.shortCode}</span>
-                    <span className="text-black/50">
-                      {t.claimCode} · {t.status}
-                    </span>
+                    <span className="text-black/50">{t.status}</span>
                   </li>
                 ))}
               </ul>

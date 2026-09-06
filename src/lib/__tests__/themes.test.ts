@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import {
   DEFAULT_THEME,
   resolveScanTheme,
-  canSelectTheme,
   themeCssVars,
   contrastRatio,
   resolveMascot,
@@ -12,7 +11,6 @@ import {
 const freeTheme: ThemeSkin = {
   slug: "sunrise",
   name: "Sunrise",
-  tier: "FREE",
   bgColor: "#FFF7ED",
   surfaceColor: "#FFFFFF",
   inkColor: "#1F2937",
@@ -20,41 +18,17 @@ const freeTheme: ThemeSkin = {
   mascot: "BLOB",
 };
 
-const premiumTheme: ThemeSkin = { ...freeTheme, slug: "night-guardian", tier: "PREMIUM", mascot: "GUARDIAN" };
 
 describe("resolveScanTheme", () => {
   it("falls back to the default when a tag has no theme", () => {
-    expect(resolveScanTheme(null, true)).toEqual(DEFAULT_THEME);
-    expect(resolveScanTheme(undefined, false)).toEqual(DEFAULT_THEME);
+    expect(resolveScanTheme(null)).toEqual(DEFAULT_THEME);
+    expect(resolveScanTheme(undefined)).toEqual(DEFAULT_THEME);
   });
 
-  it("renders a free theme regardless of subscription", () => {
-    expect(resolveScanTheme(freeTheme, false)).toEqual(freeTheme);
-    expect(resolveScanTheme(freeTheme, true)).toEqual(freeTheme);
-  });
-
-  it("renders a premium theme for an entitled owner", () => {
-    expect(resolveScanTheme(premiumTheme, true)).toEqual(premiumTheme);
-  });
-
-  it("degrades a premium theme to the default when the owner has lapsed", () => {
-    // The tag keeps its themeId in the database; only the render degrades, so
-    // re-subscribing restores the look instead of losing it.
-    expect(resolveScanTheme(premiumTheme, false)).toEqual(DEFAULT_THEME);
-  });
-
-  it("never returns a premium skin to an unentitled viewer", () => {
-    expect(resolveScanTheme(premiumTheme, false).tier).toBe("FREE");
-  });
-});
-
-describe("canSelectTheme", () => {
-  it("lets anyone pick a free theme", () => {
-    expect(canSelectTheme(freeTheme, false)).toBe(true);
-  });
-  it("gates premium themes behind a subscription", () => {
-    expect(canSelectTheme(premiumTheme, false)).toBe(false);
-    expect(canSelectTheme(premiumTheme, true)).toBe(true);
+  it("renders whatever theme the tag carries", () => {
+    // Themes are cosmetic: a subscription is already required for the page to
+    // show anything, so there is nothing further to gate.
+    expect(resolveScanTheme(freeTheme)).toEqual(freeTheme);
   });
 });
 

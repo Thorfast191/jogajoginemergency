@@ -17,9 +17,7 @@ export default async function AdminOverviewPage() {
   const [
     customers,
     suspended,
-    unassignedTags,
     issuedTags,
-    allocatedTags,
     activeSubs,
     openReports,
     scanCount,
@@ -29,9 +27,7 @@ export default async function AdminOverviewPage() {
   ] = await Promise.all([
     prisma.user.count({ where: { role: "USER" } }),
     prisma.user.count({ where: { role: "USER", status: "SUSPENDED" } }),
-    prisma.tag.count({ where: { status: "UNASSIGNED", userId: null } }),
-    prisma.tag.count({ where: { userId: { not: null } } }),
-    prisma.tag.count({ where: { status: "ALLOCATED" } }),
+    prisma.tag.count(),
     prisma.subscription.count({ where: { status: "ACTIVE" } }),
     prisma.abuseReport.count({ where: { status: "OPEN" } }),
     prisma.scanEvent.count(),
@@ -51,7 +47,6 @@ export default async function AdminOverviewPage() {
         { label: "Active products", value: activeProducts, href: "/admin/products" },
         { label: "Orders (7 days)", value: recentOrders, href: "/admin/orders" },
         { label: "Order revenue (BDT)", value: revenueBdt, href: "/admin/orders" },
-        { label: "Tags allocated, not active", value: allocatedTags, href: "/admin/tags" },
       ],
     },
     {
@@ -65,7 +60,6 @@ export default async function AdminOverviewPage() {
     {
       title: "Tag inventory",
       stats: [
-        { label: "Unassigned / available", value: unassignedTags, href: "/admin/tags" },
         { label: "Issued to customers", value: issuedTags, href: "/admin/tags/issued" },
       ],
     },

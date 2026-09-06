@@ -77,8 +77,7 @@ export default async function ProfilePage() {
       <div className="mt-10 max-w-lg">
         <h2 className="font-semibold">Portfolio</h2>
         <p className="mt-1 mb-3 text-sm text-black/60">
-          The optional half of your scan page — a line about you and where to find you. Emergency
-          details above are always shown; this part needs Plus.
+          The optional half of your scan page — a line about you and where to find you.
         </p>
         <PortfolioEditor
           bio={profile.bio}

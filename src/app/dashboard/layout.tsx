@@ -13,7 +13,7 @@ const links = [
   { href: "/dashboard/orders", label: "Orders" },
   { href: "/dashboard/messages", label: "Messages" },
   { href: "/dashboard/settings", label: "Settings" },
-  { href: "/dashboard/subscription", label: "Plus" },
+  { href: "/dashboard/subscription", label: "Subscription" },
 ];
 
 export default async function DashboardLayout({

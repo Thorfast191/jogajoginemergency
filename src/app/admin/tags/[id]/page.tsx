@@ -3,90 +3,108 @@ import { notFound, redirect } from "next/navigation";
 import { getAdmin } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { tagUrl } from "@/lib/qr";
+import { summarizeUserAgent } from "@/lib/user-agent";
 import { TagAdminControls } from "./tag-admin-controls";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminTagDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  if (!(await getAdmin())) redirect("/dashboard");
   const { id } = await params;
+  if (!(await getAdmin())) redirect("/dashboard");
 
   const tag = await prisma.tag.findUnique({
     where: { id },
     include: {
-      user: { select: { id: true, name: true, email: true } },
-      product: { select: { name: true } },
-      batch: { select: { label: true, createdAt: true } },
-      orderItem: { select: { orderId: true } },
-      _count: { select: { scanEvents: true, relayMessages: true } },
+      user: { select: { id: true, name: true, email: true, status: true } },
+      product: { select: { name: true, slug: true } },
+      theme: { select: { name: true } },
+      orderItem: { select: { orderId: true, order: { select: { orderNumber: true } } } },
+      _count: { select: { scanEvents: true, relayMessages: true, abuseReports: true } },
     },
   });
   if (!tag) notFound();
 
-  const url = tagUrl(tag.shortCode);
-  const rows: Array<{ label: string; value: React.ReactNode }> = [
-    { label: "Short code", value: <span className="font-mono">{tag.shortCode}</span> },
-    { label: "Claim code", value: <span className="font-mono">{tag.claimCode}</span> },
-    { label: "Status", value: tag.status },
-    { label: "Product", value: tag.product?.name ?? "—" },
-    { label: "Internal label", value: tag.internalLabel ?? "—" },
-    {
-      label: "Owner",
-      value: tag.user ? (
-        <Link href={`/admin/users/${tag.user.id}`} className="text-emerald-700 hover:underline">
-          {tag.user.name} · {tag.user.email}
-        </Link>
-      ) : (
-        "—"
-      ),
-    },
-    {
-      label: "Order",
-      value: tag.orderItem?.orderId ? (
+  const scans = await prisma.scanEvent.findMany({
+    where: { tagId: tag.id },
+    orderBy: { scannedAt: "desc" },
+    take: 20,
+  });
+
+  const facts: Array<[string, React.ReactNode]> = [
+    ["Public URL", <span key="u" className="font-mono text-xs">{tagUrl(tag.shortCode)}</span>],
+    [
+      "Owner",
+      <Link key="o" href={`/admin/users/${tag.user.id}`} className="text-emerald-700 hover:underline">
+        {tag.user.name} ({tag.user.email})
+      </Link>,
+    ],
+    ["Account status", tag.user.status],
+    ["Product", tag.product?.name ?? "—"],
+    ["Theme", tag.theme?.name ?? "Default"],
+    [
+      "Paid by order",
+      tag.orderItem?.order ? (
         <Link
+          key="ord"
           href={`/admin/orders/${tag.orderItem.orderId}`}
           className="text-emerald-700 hover:underline"
         >
-          View order
+          {tag.orderItem.order.orderNumber}
         </Link>
       ) : (
         "—"
       ),
-    },
-    {
-      label: "Batch",
-      value: tag.batch ? `${tag.batch.label} (${tag.batch.createdAt.toLocaleDateString()})` : "—",
-    },
-    { label: "Scans", value: tag._count.scanEvents },
-    { label: "Messages", value: tag._count.relayMessages },
-    {
-      label: "Public page",
-      value: (
-        <a href={url} target="_blank" rel="noreferrer" className="text-emerald-700 hover:underline">
-          {url}
-        </a>
-      ),
-    },
+    ],
+    ["Private label", tag.internalLabel ?? "—"],
+    ["Created", tag.createdAt.toLocaleString()],
+    ["Scans", tag._count.scanEvents],
+    ["Relay messages", tag._count.relayMessages],
+    ["Abuse reports", tag._count.abuseReports],
   ];
 
   return (
     <div>
       <Link href="/admin/tags" className="text-sm text-black/50 hover:underline">
-        ← Tag inventory
+        ← Back to tags
       </Link>
-      <h1 className="mt-2 text-2xl font-bold font-mono">{tag.shortCode}</h1>
+      <h1 className="mt-2 font-mono text-2xl font-bold">/t/{tag.shortCode}</h1>
 
-      <dl className="mt-6 max-w-xl divide-y divide-black/10 rounded-lg border border-black/10 text-sm">
-        {rows.map((row) => (
-          <div key={row.label} className="flex justify-between gap-4 px-4 py-2.5">
-            <dt className="text-black/50">{row.label}</dt>
-            <dd className="text-right">{row.value}</dd>
+      <div className="mt-6 grid gap-8 lg:grid-cols-2">
+        <div>
+          <dl className="divide-y divide-black/10 rounded-xl border border-black/10 bg-white text-sm">
+            {facts.map(([label, value]) => (
+              <div key={label} className="flex justify-between gap-4 px-4 py-2.5">
+                <dt className="text-black/50">{label}</dt>
+                <dd className="text-right">{value}</dd>
+              </div>
+            ))}
+          </dl>
+
+          <div className="mt-6">
+            <h2 className="font-semibold">Status</h2>
+            <div className="mt-2">
+              <TagAdminControls tagId={tag.id} status={tag.status} />
+            </div>
           </div>
-        ))}
-      </dl>
+        </div>
 
-      <div className="mt-6">
-        <TagAdminControls tagId={tag.id} status={tag.status} />
+        <div>
+          <h2 className="font-semibold">Recent scans</h2>
+          {scans.length === 0 ? (
+            <p className="mt-2 text-sm text-black/50">No scans yet.</p>
+          ) : (
+            <ul className="mt-3 divide-y divide-black/10 rounded-xl border border-black/10 bg-white">
+              {scans.map((s) => (
+                <li key={s.id} className="flex justify-between gap-3 p-3 text-sm">
+                  <span>{s.scannedAt.toLocaleString()}</span>
+                  <span className="text-right text-xs text-black/50">
+                    {summarizeUserAgent(s.userAgent)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
     </div>
   );

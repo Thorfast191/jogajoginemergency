@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { orderStatusSchema, fulfillmentStatusSchema } from "@/lib/validations";
-import { allocateTags } from "@/lib/order";
+import { createTag } from "@/lib/tag";
 
 export type OrderActionState = { error?: string; ok?: boolean };
 
@@ -67,33 +67,34 @@ export async function updateFulfillmentAction(
   return { ok: true };
 }
 
+/**
+ * Support action: mint an extra QR for this order line without spending one of
+ * the customer's slots. For replacing a sticker that arrived damaged or a code
+ * that had to be taken down.
+ */
 export async function issueReplacementTagAction(orderItemId: string): Promise<OrderActionState> {
   await requireAdmin();
 
   const item = await prisma.orderItem.findUnique({
     where: { id: orderItemId },
-    select: { id: true, productId: true, orderId: true, order: { select: { userId: true } } },
+    select: {
+      id: true,
+      productId: true,
+      orderId: true,
+      product: { select: { themeId: true } },
+      order: { select: { userId: true } },
+    },
   });
   if (!item) return { error: "Order line not found." };
 
-  try {
-    await prisma.$transaction(async (tx) => {
-      const [tagId] = await allocateTags(tx, {
-        productId: item.productId,
-        orderItemId: item.id,
-        quantity: 1,
-      });
-      await tx.tag.update({
-        where: { id: tagId },
-        data: { userId: item.order.userId, status: "ACTIVE" },
-      });
-    });
-  } catch (e) {
-    if (e instanceof Error && e.message === "OUT_OF_STOCK") {
-      return { error: "No spare inventory for that product — generate a batch first." };
-    }
-    throw e;
-  }
+  await prisma.$transaction((tx) =>
+    createTag(tx, {
+      userId: item.order.userId,
+      productId: item.productId,
+      orderItemId: item.id,
+      themeId: item.product.themeId,
+    }),
+  );
 
   revalidate(item.orderId);
   return { ok: true };

@@ -22,8 +22,6 @@ enum UserStatus {
 }
 
 enum TagStatus {
-  UNASSIGNED // raw inventory, no owner
-  ALLOCATED // attached to an order, not yet activated
   ACTIVE
   LOST
   DEACTIVATED
@@ -45,6 +43,7 @@ enum PaymentProvider {
   DEMO
   SSLCOMMERZ
   BKASH
+  NAGAD
   STRIPE
 }
 
@@ -52,6 +51,7 @@ enum PaymentStatus {
   SUCCEEDED
   FAILED
   PENDING
+  CANCELLED
 }
 
 enum PaymentKind {
@@ -93,11 +93,6 @@ enum VisibilityPreset {
   CUSTOM
 }
 
-enum ThemeTier {
-  FREE
-  PREMIUM
-}
-
 enum MediaKind {
   PROFILE_PHOTO
   PRODUCT_IMAGE
@@ -127,7 +122,6 @@ model User {
   emergencyProfile EmergencyProfile?
   orders           Order[]
   mediaAssets      MediaAsset[]      @relation("MediaOwner")
-  tagBatches       TagBatch[]
 
   @@index([email])
 }
@@ -211,11 +205,10 @@ model Subscription {
 // artwork asset, so no third-party character is referenced in code or seed
 // data. Licensed characters, if ever licensed, are added as rows.
 model Theme {
-  id      String    @id @default(cuid())
-  slug    String    @unique
+  id      String @id @default(cuid())
+  slug    String @unique
   name    String
   tagline String
-  tier    ThemeTier @default(FREE)
 
   // Scan-page skin tokens. Explicit columns rather than a JSON blob so the
   // admin form and the renderer share one typed contract, and a malformed
@@ -248,6 +241,8 @@ model Product {
   useCase      String?
   priceCents   Int
   currency     String        @default("BDT")
+  // How many QR codes this purchase entitles the buyer to generate.
+  qrSlots      Int           @default(1)
   imageAssetId String?
   themeId      String?
   status       ProductStatus @default(DRAFT)
@@ -259,46 +254,33 @@ model Product {
   theme      Theme?      @relation(fields: [themeId], references: [id])
   tags       Tag[]
   orderItems OrderItem[]
-  batches    TagBatch[]
 
   @@index([status, sortOrder])
 }
 
-model TagBatch {
-  id          String   @id @default(cuid())
-  label       String
-  productId   String?
-  quantity    Int
-  createdById String
-  createdAt   DateTime @default(now())
-
-  product   Product? @relation(fields: [productId], references: [id])
-  createdBy User     @relation(fields: [createdById], references: [id])
-  tags      Tag[]
-
-  @@index([productId])
-}
-
 model Order {
-  id                String            @id @default(cuid())
-  orderNumber       String            @unique
+  id                   String            @id @default(cuid())
+  orderNumber          String            @unique
   // Per-checkout-form token. The unique index is what makes a double-submit
   // return the original order instead of placing a second one.
-  idempotencyKey    String?           @unique
-  userId            String
-  status            OrderStatus       @default(PENDING)
-  fulfillmentStatus FulfillmentStatus @default(UNFULFILLED)
-  subtotalCents     Int
-  totalCents        Int
-  currency          String            @default("BDT")
-  shipName          String?
-  shipPhone         String?
-  shipAddress       String?
-  shipCity          String?
-  shipNote          String?
-  placedAt          DateTime?
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
+  idempotencyKey       String?           @unique
+  userId               String
+  status               OrderStatus       @default(PENDING)
+  fulfillmentStatus    FulfillmentStatus @default(UNFULFILLED)
+  subtotalCents        Int
+  totalCents           Int
+  currency             String            @default("BDT")
+  shipName             String?
+  shipPhone            String?
+  shipAddress          String?
+  shipCity             String?
+  shipNote             String?
+  placedAt             DateTime?
+  // Tags are reserved when the order is created and released again if the
+  // customer never comes back from the gateway.
+  reservationExpiresAt DateTime?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
 
   user     User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   items    OrderItem[]
@@ -323,23 +305,36 @@ model OrderItem {
   @@index([orderId])
 }
 
+// A Payment row is created *before* the customer leaves for the gateway, and
+// its own id is the merchant transaction reference we hand over. The callback
+// therefore identifies the payment without trusting anything else in the
+// payload — see src/lib/payments/settle.ts.
 model Payment {
-  id             String          @id @default(cuid())
-  kind           PaymentKind     @default(ORDER)
-  orderId        String?
-  subscriptionId String?
-  amountCents    Int
-  currency       String          @default("BDT")
-  provider       PaymentProvider @default(DEMO)
-  providerRef    String?
-  status         PaymentStatus   @default(PENDING)
-  createdAt      DateTime        @default(now())
+  id               String          @id @default(cuid())
+  kind             PaymentKind     @default(ORDER)
+  orderId          String?
+  subscriptionId   String?
+  amountCents      Int
+  currency         String          @default("BDT")
+  provider         PaymentProvider @default(DEMO)
+  // The provider's own transaction id, known only once it settles.
+  providerRef      String?
+  // The provider's handle for the in-flight payment (bKash paymentID, Nagad
+  // paymentReferenceId, SSLCommerz sessionkey), needed to verify or execute it.
+  gatewayPaymentId String?
+  status           PaymentStatus   @default(PENDING)
+  failureReason    String?
+  settledAt        DateTime?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
 
   order        Order?        @relation(fields: [orderId], references: [id], onDelete: Cascade)
   subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
   @@index([subscriptionId])
+  @@index([gatewayPaymentId])
+  @@index([status, createdAt])
 }
 
 // --- Physical QR tags --------------------------------------------------
@@ -347,24 +342,21 @@ model Payment {
 model Tag {
   id            String    @id @default(cuid())
   shortCode     String    @unique
-  claimCode     String    @unique
-  productId     String?
-  batchId       String?
+  // Every tag is created by its owner from the client area, against a QR slot
+  // a sticker purchase paid for. There is no unowned inventory.
+  userId        String
+  // Which purchase paid for this tag's slot, kept for provenance only.
   orderItemId   String?
-  userId        String?
-  // The scan page's skin. Copied from the product at allocation; a subscriber
-  // may re-skin it afterwards. Kept even while a subscription is lapsed so
-  // re-subscribing restores the look rather than losing it.
+  productId     String?
   themeId       String?
   internalLabel String?
-  status        TagStatus @default(UNASSIGNED)
+  status        TagStatus @default(ACTIVE)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   product       Product?       @relation(fields: [productId], references: [id])
-  batch         TagBatch?      @relation(fields: [batchId], references: [id])
   orderItem     OrderItem?     @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
-  user          User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
   theme         Theme?         @relation(fields: [themeId], references: [id])
   scanEvents    ScanEvent[]
   relayMessages RelayMessage[]

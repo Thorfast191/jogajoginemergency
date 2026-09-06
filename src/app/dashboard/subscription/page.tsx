@@ -10,17 +10,17 @@ import { subscribeAction, cancelSubscriptionAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-const PLUS_FEATURES = [
-  ["Portfolio on your scan page", "Add a short bio and links — socials, website, anything."],
-  ["Premium themes", "Re-skin any tag with the full theme collection."],
-  ["Full scan history", "Every scan, not just the last five."],
+const INCLUDED = [
+  ["Your page goes live", "Every QR you have starts showing the information you chose to share."],
+  ["Emergency details", "Blood group, allergies, medical notes and your emergency contacts."],
+  ["Portfolio and themes", "A short bio, your links, and any theme on any tag."],
 ];
 
-const ALWAYS_FREE = [
-  "Your emergency profile and every medical field",
-  "Emergency contacts and the masked message relay",
-  "Free themes on every tag",
-  "Marking a tag lost, and per-field privacy controls",
+const WITHOUT_IT = [
+  "Your QR codes still scan, and still belong to you",
+  "Finders can still message you through the anonymous relay",
+  "Your information stays saved — it just isn't published",
+  "You keep every sticker and QR you bought",
 ];
 
 export default async function SubscriptionPage() {
@@ -48,7 +48,7 @@ export default async function SubscriptionPage() {
     <div>
       <PageHeader
         title="Plus"
-        subtitle="Optional. Your emergency information is free forever, with or without it."
+        subtitle="A subscription is what makes the page your QR codes open actually show your information."
       />
 
       <Card className="mt-6">
@@ -60,7 +60,7 @@ export default async function SubscriptionPage() {
           )}
           <div className="flex-1">
             <p className="font-bold">
-              {entitled ? "You're on Plus" : "You're on the free plan"}{" "}
+              {entitled ? "Your page is live" : "Your page isn't published"}{" "}
               {entitled && <Badge tone="grape">Active</Badge>}
             </p>
             {subscription && entitled ? (
@@ -69,7 +69,7 @@ export default async function SubscriptionPage() {
               </p>
             ) : (
               <p className="mt-1 text-sm text-black/60">
-                Everything safety-critical already works. Plus adds the extras below.
+Your QR codes scan, but they don&apos;t show your information yet.
               </p>
             )}
             {entitled && (
@@ -88,9 +88,9 @@ export default async function SubscriptionPage() {
 
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
         <div>
-          <h2 className="font-bold">What Plus adds</h2>
+          <h2 className="font-bold">What a subscription gives you</h2>
           <ul className="mt-3 space-y-3">
-            {PLUS_FEATURES.map(([title, body]) => (
+            {INCLUDED.map(([title, body]) => (
               <li key={title} className="rounded-xl border border-black/10 bg-white p-3">
                 <p className="text-sm font-semibold">{title}</p>
                 <p className="mt-0.5 text-sm text-black/60">{body}</p>
@@ -100,18 +100,18 @@ export default async function SubscriptionPage() {
         </div>
 
         <div>
-          <h2 className="font-bold">Always free</h2>
-          <ul className="mt-3 space-y-2 rounded-xl border border-emerald-200 bg-emerald-50/60 p-4">
-            {ALWAYS_FREE.map((f) => (
-              <li key={f} className="flex gap-2 text-sm text-emerald-900">
+          <h2 className="font-bold">Without one</h2>
+          <ul className="mt-3 space-y-2 rounded-xl border border-black/10 bg-black/[0.02] p-4">
+            {WITHOUT_IT.map((f) => (
+              <li key={f} className="flex gap-2 text-sm text-black/70">
                 <span aria-hidden>✓</span>
                 <span>{f}</span>
               </li>
             ))}
           </ul>
           <p className="mt-3 text-xs text-black/50">
-            If your subscription lapses, a first responder still sees your blood group, allergies
-            and emergency contacts. That never sits behind a paywall.
+If it lapses, your page goes quiet but the relay stays open, so a lost item can
+            still find its way back to you.
           </p>
         </div>
       </div>

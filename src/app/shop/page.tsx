@@ -23,8 +23,8 @@ export default async function ShopPage() {
         <div className="text-center">
           <h1 className="text-3xl font-bold sm:text-4xl">QR stickers for the things you carry</h1>
           <p className="mx-auto mt-3 max-w-xl text-black/60">
-            One-time purchase. Every sticker links to your emergency profile — and your emergency
-            information is free forever.
+Each sticker is a one-time purchase and comes with a QR code you generate
+            yourself. A subscription keeps the page it opens live.
           </p>
         </div>
 
@@ -62,7 +62,7 @@ export default async function ShopPage() {
                   </Link>
                   {p.theme && (
                     <p className="mt-1">
-                      <Badge tone={p.theme.tier === "PREMIUM" ? "grape" : "neutral"}>
+                      <Badge tone="neutral">
                         {p.theme.name}
                       </Badge>
                     </p>

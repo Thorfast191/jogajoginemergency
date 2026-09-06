@@ -5,11 +5,16 @@ import { Prisma } from "@prisma/client";
 import { requireCustomer } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { checkoutSchema } from "@/lib/validations";
-import { generateOrderNumber, allocateTags } from "@/lib/order";
+import { generateOrderNumber } from "@/lib/order";
 import { readCart, resolveCart, writeCart } from "@/lib/cart-server";
 
 export type CheckoutState = { error?: string };
 
+/**
+ * Buying a sticker grants QR slots, not a pre-made code. Nothing is allocated
+ * from inventory here — the customer generates their own tags afterwards from
+ * the client area, and `src/lib/slots.ts` decides how many they may make.
+ */
 export async function createOrderAction(
   _prev: CheckoutState,
   formData: FormData,
@@ -39,15 +44,13 @@ export async function createOrderAction(
   const { idempotencyKey } = parsed.data;
 
   // A resubmitted form (double-click, back-then-forward, a flaky connection
-  // retrying the POST) must not place a second order, take a second payment,
-  // and burn more tags out of inventory.
+  // retrying the POST) must not place a second order or take a second payment.
   const replay = await findOwnOrderByKey(idempotencyKey, user.id);
   if (replay) redirect(`/checkout/success?order=${replay}`);
 
   let orderNumber = "";
   try {
     orderNumber = await prisma.$transaction(async (tx) => {
-      // Unique order number with a small retry.
       let number = generateOrderNumber();
       for (let i = 0; i < 5; i++) {
         const clash = await tx.order.findUnique({ where: { orderNumber: number } });
@@ -69,33 +72,16 @@ export async function createOrderAction(
           shipAddress: parsed.data.shipAddress ?? null,
           shipCity: parsed.data.shipCity ?? null,
           shipNote: parsed.data.shipNote ?? null,
+          items: {
+            create: cart.lines.map((line) => ({
+              productId: line.productId,
+              quantity: line.qty,
+              unitPriceCents: line.unitPriceCents,
+              currency: line.currency,
+            })),
+          },
         },
       });
-
-      for (const line of cart.lines) {
-        const item = await tx.orderItem.create({
-          data: {
-            orderId: order.id,
-            productId: line.productId,
-            quantity: line.qty,
-            unitPriceCents: line.unitPriceCents,
-            currency: line.currency,
-          },
-        });
-
-        const tagIds = await allocateTags(tx, {
-          productId: line.productId,
-          orderItemId: item.id,
-          quantity: line.qty,
-        });
-
-        // The sticker's own theme becomes the scan page's starting skin. A
-        // subscriber can change it later from the dashboard.
-        await tx.tag.updateMany({
-          where: { id: { in: tagIds } },
-          data: { userId: user.id, status: "ACTIVE", themeId: line.themeId },
-        });
-      }
 
       await tx.payment.create({
         data: {
@@ -105,6 +91,7 @@ export async function createOrderAction(
           currency: cart.currency,
           provider: "DEMO",
           status: "SUCCEEDED",
+          settledAt: new Date(),
           providerRef: `demo_${Date.now()}`,
         },
       });
@@ -117,10 +104,6 @@ export async function createOrderAction(
       return number;
     });
   } catch (e) {
-    if (e instanceof Error && e.message === "OUT_OF_STOCK") {
-      console.warn(`[checkout] out of stock: ${cart.lines.map((l) => l.slug).join(",")}`);
-      return { error: "Sorry, one of those just sold out. We're restocking — please check back." };
-    }
     // Two submits of the same form raced and the other one won. Whether the
     // clash was on our key (rather than the retried order number) is settled
     // by looking it up: if an order now exists under it, that is the winner.

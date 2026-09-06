@@ -17,8 +17,8 @@ export default async function AdminProductsPage() {
 
   const themes = await prisma.theme.findMany({
     where: { status: "ACTIVE" },
-    orderBy: [{ tier: "asc" }, { sortOrder: "asc" }],
-    select: { id: true, name: true, tier: true },
+    orderBy: { sortOrder: "asc" },
+    select: { id: true, name: true },
   });
 
   return (

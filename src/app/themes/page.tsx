@@ -4,7 +4,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { prisma } from "@/lib/prisma";
 import { themeCssVars, type ThemeSkin } from "@/lib/themes";
 import { ThemeMascot } from "@/components/illustrations";
-import { Badge, EmptyState } from "@/components/ui";
+import { EmptyState } from "@/components/ui";
 import { EmptyTags } from "@/components/illustrations";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function ThemesPage() {
   const themes = await prisma.theme.findMany({
     where: { status: "ACTIVE" },
-    orderBy: [{ tier: "asc" }, { sortOrder: "asc" }],
+    orderBy: { sortOrder: "asc" },
     include: { products: { where: { status: "ACTIVE" }, select: { slug: true, name: true } } },
   });
 
@@ -49,9 +49,7 @@ export default async function ThemesPage() {
                 <div className="bg-white p-4">
                   <div className="flex items-center justify-between gap-2">
                     <h2 className="font-bold">{t.name}</h2>
-                    <Badge tone={t.tier === "PREMIUM" ? "grape" : "emerald"}>
-                      {t.tier === "PREMIUM" ? "Plus" : "Free"}
-                    </Badge>
+
                   </div>
                   <p className="mt-1 text-sm text-black/60">{t.tagline}</p>
                   {t.products.length > 0 && (

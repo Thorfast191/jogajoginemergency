@@ -11,7 +11,6 @@ type Theme = {
   slug: string;
   name: string;
   tagline: string;
-  tier: string;
   bgColor: string;
   surfaceColor: string;
   inkColor: string;
@@ -66,7 +65,7 @@ export function ThemeForm({ theme }: { theme?: Theme }) {
         <Colour name="accentColor" label="Accent" value={theme?.accentColor ?? "#059669"} />
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-3">
         <label className="block">
           <span className="mb-1 block text-xs font-medium">Mascot</span>
           <select name="mascot" defaultValue={theme?.mascot ?? "BLOB"} className={input}>
@@ -75,13 +74,6 @@ export function ThemeForm({ theme }: { theme?: Theme }) {
                 {m}
               </option>
             ))}
-          </select>
-        </label>
-        <label className="block">
-          <span className="mb-1 block text-xs font-medium">Tier</span>
-          <select name="tier" defaultValue={theme?.tier ?? "FREE"} className={input}>
-            <option value="FREE">Free</option>
-            <option value="PREMIUM">Premium (Plus)</option>
           </select>
         </label>
         <label className="block">

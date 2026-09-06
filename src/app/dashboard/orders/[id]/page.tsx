@@ -46,7 +46,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                     /t/{t.shortCode}
                   </Link>
                   <span className="text-black/50">
-                    claim <span className="font-mono">{t.claimCode}</span>
+                    claim <span className="font-mono"></span>
                   </span>
                 </li>
               ))}

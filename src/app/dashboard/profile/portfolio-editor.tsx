@@ -13,8 +13,9 @@ const inputClass =
   "rounded-xl border border-black/15 px-3 py-2 text-sm focus:border-[var(--color-primary)] focus:outline-none";
 
 /**
- * Bio and links. Editable on the free plan on purpose — the data belongs to the
- * owner either way — but clearly marked as unpublished until Plus is active.
+ * Bio and links. Editable without a subscription on purpose — the data belongs
+ * to the owner either way — but clearly marked as unpublished until the page is
+ * live.
  */
 export function PortfolioEditor({
   bio,
@@ -33,9 +34,9 @@ export function PortfolioEditor({
     <div className="space-y-5">
       {!entitled && (
         <p className="rounded-xl bg-violet-50 px-4 py-3 text-sm text-violet-900">
-          Your portfolio is saved but <strong>not shown</strong> on your scan page yet.{" "}
+          Saved, but <strong>not published</strong> — your page isn&apos;t live yet.{" "}
           <Link href="/dashboard/subscription" className="font-semibold hover:underline">
-            Plus publishes it →
+            Subscribe to publish it →
           </Link>
         </p>
       )}

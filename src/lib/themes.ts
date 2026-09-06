@@ -4,12 +4,9 @@
 // the scan page renders in. This module owns only the second one, plus the
 // rules about who may use what.
 
-export type ThemeTier = "FREE" | "PREMIUM";
-
 export type ThemeSkin = {
   slug: string;
   name: string;
-  tier: ThemeTier;
   bgColor: string;
   surfaceColor: string;
   inkColor: string;
@@ -24,7 +21,6 @@ export type MascotKey = (typeof MASCOTS)[number];
 export const DEFAULT_THEME: ThemeSkin = {
   slug: "classic",
   name: "Classic",
-  tier: "FREE",
   bgColor: "#FBF9F6",
   surfaceColor: "#FFFFFF",
   inkColor: "#171717",
@@ -33,24 +29,12 @@ export const DEFAULT_THEME: ThemeSkin = {
 };
 
 /**
- * The skin a scan should actually render in.
- *
- * A premium skin on a lapsed account degrades to the default rather than
- * breaking or leaking. The tag's stored themeId is deliberately left alone, so
- * re-subscribing restores the look instead of losing it.
+ * The skin a scan should render in. Themes are cosmetic: a subscription is
+ * already required for the page to show anything, so every skin on a live page
+ * is paid for by definition.
  */
-export function resolveScanTheme(
-  theme: ThemeSkin | null | undefined,
-  entitled: boolean,
-): ThemeSkin {
-  if (!theme) return DEFAULT_THEME;
-  if (theme.tier === "PREMIUM" && !entitled) return DEFAULT_THEME;
-  return theme;
-}
-
-/** Whether an owner may choose this theme for one of their tags. */
-export function canSelectTheme(theme: { tier: ThemeTier }, entitled: boolean): boolean {
-  return theme.tier === "FREE" || entitled;
+export function resolveScanTheme(theme: ThemeSkin | null | undefined): ThemeSkin {
+  return theme ?? DEFAULT_THEME;
 }
 
 export function resolveMascot(key: string | null | undefined): MascotKey {

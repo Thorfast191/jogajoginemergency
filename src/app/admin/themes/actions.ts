@@ -13,7 +13,6 @@ function parse(formData: FormData) {
     slug: formData.get("slug"),
     name: formData.get("name"),
     tagline: formData.get("tagline"),
-    tier: formData.get("tier"),
     bgColor: formData.get("bgColor") || undefined,
     surfaceColor: formData.get("surfaceColor") || undefined,
     inkColor: formData.get("inkColor") || undefined,

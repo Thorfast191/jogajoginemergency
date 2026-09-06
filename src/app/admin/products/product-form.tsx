@@ -19,7 +19,7 @@ type Product = {
   themeId: string | null;
 };
 
-type ThemeOption = { id: string; name: string; tier: string };
+type ThemeOption = { id: string; name: string };
 
 export function ProductForm({
   product,
@@ -99,7 +99,6 @@ export function ProductForm({
             {themes.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.name}
-                {t.tier === "PREMIUM" ? " (Plus skin)" : ""}
               </option>
             ))}
           </select>

@@ -1,10 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import {
-  entitlementsFor,
-  isEntitled,
-  type Entitlements,
-  type SubStatus,
-} from "@/lib/entitlements";
+import { isEntitled, type SubStatus } from "@/lib/entitlements";
 
 // Server-side bridge between the Subscription table and the pure entitlement
 // rules. Everything that needs to know "is this account paid up?" goes through
@@ -28,10 +23,6 @@ export async function activeSubscriptionStatus(userId: string): Promise<SubStatu
     select: { status: true },
   });
   return sub?.status ?? null;
-}
-
-export async function entitlementsForUser(userId: string): Promise<Entitlements> {
-  return entitlementsFor(await activeSubscriptionStatus(userId));
 }
 
 export async function userIsEntitled(userId: string): Promise<boolean> {

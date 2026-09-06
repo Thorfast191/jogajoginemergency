@@ -26,6 +26,33 @@ export function PublicProfileCard({
   ];
   const hasMedical = medical.some(([, v]) => v);
 
+  // Dormant: the owner has no active subscription, so nothing about them is
+  // shown. The relay stays open so a found item can still be returned — see
+  // LAPSED_BEHAVIOUR in src/lib/entitlements.ts.
+  if (!view.active) {
+    return (
+      <div className="text-[var(--skin-ink)]">
+        <div className="text-center">
+          <ThemeMascot
+            mascot={mascot}
+            className="mx-auto mb-2 h-20 w-20 text-[var(--skin-accent)]"
+          />
+          <h1 className="text-lg font-bold">Someone&apos;s belongings</h1>
+          <p className="mt-2 text-sm text-[var(--skin-muted)]">
+            {view.relayOpen
+              ? "This tag's details aren't published right now, but you can still send its owner a message and they'll get in touch."
+              : "This tag isn't active right now."}
+          </p>
+        </div>
+        {view.relayOpen && (
+          <div className="mt-6">
+            <RelayForm shortCode={shortCode} />
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="text-[var(--skin-ink)]">
       {view.lost && (
