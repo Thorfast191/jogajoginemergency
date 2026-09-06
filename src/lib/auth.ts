@@ -43,6 +43,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (user) {
         token.role = (user as { role?: string }).role ?? "USER";
         token.id = user.id as string;
+        // Sign-in time, seconds since epoch. `requireActiveUser` compares it
+        // against User.passwordChangedAt so a password reset immediately
+        // invalidates tokens minted before it.
+        token.authAt = Math.floor(Date.now() / 1000);
       }
       return token;
     },
@@ -50,6 +54,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (session.user) {
         session.user.id = token.id as string;
         session.user.role = token.role as "USER" | "ADMIN";
+        session.user.authAt = token.authAt as number | undefined;
       }
       return session;
     },

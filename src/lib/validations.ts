@@ -100,6 +100,9 @@ export const privacyPresetSchema = z.object({
 // --- Store: checkout & claim ---------------------------------------
 
 export const checkoutSchema = z.object({
+  // Minted per rendered checkout form; Order.idempotencyKey is unique, so a
+  // resubmit of the same form returns the original order.
+  idempotencyKey: z.string().min(8).max(64),
   productSlug: z.string().min(1),
   quantity: z.coerce.number().int().min(1).max(10),
   shipName: z.string().max(200).optional().nullable(),

@@ -5,6 +5,8 @@ declare module "next-auth" {
     user: {
       id: string;
       role: "USER" | "ADMIN";
+      /** Sign-in time, seconds since epoch. See src/lib/token-freshness.ts. */
+      authAt?: number;
     } & DefaultSession["user"];
   }
 
@@ -17,5 +19,6 @@ declare module "next-auth/jwt" {
   interface JWT {
     id: string;
     role: "USER" | "ADMIN";
+    authAt?: number;
   }
 }

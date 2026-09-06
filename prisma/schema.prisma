@@ -99,16 +99,19 @@ enum MediaKind {
 }
 
 model User {
-  id            String     @id @default(cuid())
-  name          String
-  email         String     @unique
-  emailVerified DateTime?
-  phone         String?
-  passwordHash  String
-  role          Role       @default(USER)
-  status        UserStatus @default(ACTIVE)
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  id                String     @id @default(cuid())
+  name              String
+  email             String     @unique
+  emailVerified     DateTime?
+  phone             String?
+  passwordHash      String
+  role              Role       @default(USER)
+  status            UserStatus @default(ACTIVE)
+  // Sessions are JWTs and cannot be deleted server-side. Stamping this on a
+  // password reset lets requireActiveUser reject tokens minted before it.
+  passwordChangedAt DateTime?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
 
   tags             Tag[]
   subscriptions    Subscription[]
@@ -236,6 +239,9 @@ model TagBatch {
 model Order {
   id                String            @id @default(cuid())
   orderNumber       String            @unique
+  // Per-checkout-form token. The unique index is what makes a double-submit
+  // return the original order instead of placing a second one.
+  idempotencyKey    String?           @unique
   userId            String
   status            OrderStatus       @default(PENDING)
   fulfillmentStatus FulfillmentStatus @default(UNFULFILLED)

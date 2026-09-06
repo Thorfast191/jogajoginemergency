@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getCustomer } from "@/lib/session";
@@ -38,6 +39,10 @@ export default async function CheckoutPage({
             currency: product.currency,
           }}
           quantity={parsed.quantity}
+          // Minted here rather than in the client component so server and
+          // client render the same value (no hydration mismatch). The page is
+          // force-dynamic, so every fresh visit is a genuinely new purchase.
+          idempotencyKey={randomUUID()}
         />
       </div>
     </div>

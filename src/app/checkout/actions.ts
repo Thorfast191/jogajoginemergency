@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { Prisma } from "@prisma/client";
 import { requireCustomer } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { checkoutSchema } from "@/lib/validations";
@@ -20,6 +21,7 @@ export async function createOrderAction(
   }
 
   const parsed = checkoutSchema.safeParse({
+    idempotencyKey: formData.get("idempotencyKey"),
     productSlug: formData.get("productSlug"),
     quantity: formData.get("quantity"),
     shipName: formData.get("shipName") || null,
@@ -35,6 +37,13 @@ export async function createOrderAction(
 
   const qty = parsed.data.quantity;
   const total = product.priceCents * qty;
+  const { idempotencyKey } = parsed.data;
+
+  // A resubmitted form (double-click, back-then-forward, a flaky connection
+  // retrying the POST) must not place a second order, take a second payment,
+  // and burn two more tags out of inventory.
+  const replay = await findOwnOrderByKey(idempotencyKey, user.id);
+  if (replay) redirect(`/checkout/success?order=${replay}`);
 
   let orderNumber = "";
   try {
@@ -50,6 +59,7 @@ export async function createOrderAction(
       const order = await tx.order.create({
         data: {
           orderNumber: number,
+          idempotencyKey,
           userId: user.id,
           status: "PENDING",
           subtotalCents: total,
@@ -108,8 +118,29 @@ export async function createOrderAction(
       console.warn(`[checkout] out of stock: product=${product.slug} qty=${qty}`);
       return { error: "Sorry, that product just sold out. We're restocking — please check back." };
     }
-    throw e;
+    // Two submits of the same form raced and the other one won. Whether the
+    // clash was on our key (rather than the retried order number) is settled
+    // by looking it up: if an order now exists under it, that is the winner.
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      const winner = await findOwnOrderByKey(idempotencyKey, user.id);
+      if (!winner) throw e;
+      orderNumber = winner;
+    } else {
+      throw e;
+    }
   }
 
   redirect(`/checkout/success?order=${orderNumber}`);
+}
+
+/**
+ * The order previously placed under this key, if it belongs to this user.
+ * Scoped by owner so a leaked key can never surface someone else's order.
+ */
+async function findOwnOrderByKey(key: string, userId: string): Promise<string | null> {
+  const order = await prisma.order.findUnique({
+    where: { idempotencyKey: key },
+    select: { orderNumber: true, userId: true },
+  });
+  return order && order.userId === userId ? order.orderNumber : null;
 }

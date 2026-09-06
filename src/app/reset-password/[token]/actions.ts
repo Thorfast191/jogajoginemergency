@@ -28,9 +28,11 @@ export async function resetPasswordAction(
 
   const passwordHash = await bcrypt.hash(parsed.data.password, 10);
 
+  // Stamping this invalidates every session issued before now — the usual
+  // reason to reset a password is that someone else may hold one.
   await prisma.user.update({
     where: { email: record.identifier },
-    data: { passwordHash },
+    data: { passwordHash, passwordChangedAt: new Date() },
   });
 
   await prisma.verificationToken.delete({ where: { token: hashedToken } });

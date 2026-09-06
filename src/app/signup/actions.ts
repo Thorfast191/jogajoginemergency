@@ -6,6 +6,15 @@ import { prisma } from "@/lib/prisma";
 import { signupSchema } from "@/lib/validations";
 import { isSafeNext } from "@/lib/nav";
 import { signIn } from "@/lib/auth";
+import { recordHit } from "@/lib/rate-limit";
+import { getClientIp } from "@/lib/client-ip";
+
+// Every attempt costs here, successful or not: this caps both bulk account
+// creation and the rate at which the "already exists" reply below can be used
+// to probe for registered addresses. That reply is kept because removing it
+// needs an email-verification round-trip, and src/lib/notify.ts is still a
+// console stub — revisit once real email is wired.
+const SIGNUP_LIMIT = { limit: 5, windowMs: 60 * 60_000 };
 
 export type SignupState = { error?: string };
 
@@ -22,6 +31,11 @@ export async function signupAction(
 
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+
+  const ip = await getClientIp();
+  if (!recordHit(`signup:${ip}`, SIGNUP_LIMIT).allowed) {
+    return { error: "Too many sign-ups from this connection. Please try again later." };
   }
 
   const { name, email, phone, password } = parsed.data;

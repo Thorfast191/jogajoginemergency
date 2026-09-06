@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { isTokenStale } from "@/lib/token-freshness";
 
 // Session JWTs are only checked against `User.status` at sign-in. Without
 // this, an admin suspending a user has no effect until that user's token
@@ -11,11 +12,23 @@ export async function requireActiveUser() {
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { id: true, name: true, email: true, role: true, status: true },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      status: true,
+      passwordChangedAt: true,
+    },
   });
   if (!user || user.status !== "ACTIVE") return null;
 
-  return user;
+  // A password reset can't delete an outstanding JWT, so honour it here
+  // instead: any token minted before the reset stops working immediately.
+  const { passwordChangedAt, ...authed } = user;
+  if (isTokenStale(session.user.authAt, passwordChangedAt)) return null;
+
+  return authed;
 }
 
 export type AuthedUser = NonNullable<Awaited<ReturnType<typeof requireActiveUser>>>;

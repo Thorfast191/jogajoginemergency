@@ -8,13 +8,22 @@ const initial: CheckoutState = {};
 
 type Product = { slug: string; name: string; priceCents: number; currency: string };
 
-export function CheckoutForm({ product, quantity }: { product: Product; quantity: number }) {
+export function CheckoutForm({
+  product,
+  quantity,
+  idempotencyKey,
+}: {
+  product: Product;
+  quantity: number;
+  idempotencyKey: string;
+}) {
   const [state, formAction, pending] = useActionState(createOrderAction, initial);
   const [qty, setQty] = useState(quantity);
 
   return (
     <form action={formAction} className="space-y-6 max-w-lg">
       <input type="hidden" name="productSlug" value={product.slug} />
+      <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
 
       <div className="rounded-lg border border-black/10 p-4">
         <div className="flex justify-between">
