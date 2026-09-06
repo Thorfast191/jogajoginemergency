@@ -4,6 +4,7 @@ import { getCustomer } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { buildPublicProfileView } from "@/lib/public-profile";
 import { userIsEntitled } from "@/lib/subscription";
+import { PortfolioVisibility } from "./portfolio-visibility";
 import { FLAG_NAMES, type VisibilityFlags } from "@/lib/privacy";
 import { PublicProfileCard } from "@/components/public-profile-card";
 import { ensureProfile } from "@/app/dashboard/profile/actions";
@@ -50,6 +51,11 @@ export default async function PrivacyPage() {
       <div className="mt-6 grid lg:grid-cols-2 gap-8">
         <div>
           <PrivacyControls flags={flags} preset={profile.visibilityPreset} />
+          <PortfolioVisibility
+            bioPublic={profile.bioPublic}
+            linksPublic={profile.linksPublic}
+            entitled={entitled}
+          />
         </div>
 
         <div>

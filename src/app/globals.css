@@ -1,67 +1,112 @@
 @import "tailwindcss";
 
+/*
+ * Jogajog Emergency design tokens.
+ *
+ * The brand is deliberately warm and cartoonish — this is a product people buy
+ * for a bike helmet or a child's backpack, and a clinical interface would sell
+ * it badly. The one place that restraint reasserts itself is the scan page,
+ * which a stranger reads in an emergency: it uses --skin-* variables supplied
+ * per theme and keeps its emergency block at fixed high contrast.
+ */
 :root {
-  --background: #fbf9f6;
-  --foreground: #171717;
-  --color-primary: #059669;
-  --color-accent: #f98a6b;
-  --color-surface: #fbf9f6;
+  --background: #fffbf5;
+  --foreground: #1c1917;
+  --color-surface: #ffffff;
+
+  /* Brand */
+  --color-primary: #0f9d76;
+  --color-primary-dark: #0b7d5e;
+  --color-accent: #ff8a5b;
+
+  /* Playful supporting hues, used for illustration and category accents */
+  --color-sun: #ffc947;
+  --color-sky: #5ba9ff;
+  --color-grape: #a78bfa;
+  --color-berry: #fb7185;
+
+  /* Scan-page skin defaults, overridden per theme via inline style */
+  --skin-bg: var(--background);
+  --skin-surface: #ffffff;
+  --skin-ink: var(--foreground);
+  --skin-accent: var(--color-primary);
+
+  --radius-card: 1rem;
+  --shadow-soft: 0 1px 2px rgb(28 25 23 / 0.04), 0 8px 24px -12px rgb(28 25 23 / 0.12);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-primary: var(--color-primary);
   --color-accent: var(--color-accent);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 body {
-  background: var(--color-surface);
+  background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system,
     "Segoe UI", Roboto, sans-serif;
 }
 
+/* A soft, warm page wash used behind marketing sections. */
+.bg-wash {
+  background:
+    radial-gradient(60rem 30rem at 10% -10%, rgb(255 138 91 / 0.10), transparent 60%),
+    radial-gradient(50rem 26rem at 90% 0%, rgb(15 157 118 / 0.10), transparent 60%);
+}
+
+/*
+ * Motion. Everything decorative is gated behind prefers-reduced-motion so the
+ * whole personality layer disappears for anyone who asked for that, without
+ * taking any content or affordance with it.
+ */
 @media (prefers-reduced-motion: no-preference) {
   @keyframes float {
-    0%,
-    100% {
-      transform: translateY(0);
-    }
-    50% {
-      transform: translateY(-6px);
-    }
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
   }
   @keyframes wave {
-    0%,
-    100% {
-      transform: rotate(0deg);
-    }
-    25% {
-      transform: rotate(8deg);
-    }
-    75% {
-      transform: rotate(-6deg);
-    }
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(8deg); }
+    75% { transform: rotate(-6deg); }
   }
   @keyframes pulse-soft {
-    0%,
-    100% {
-      opacity: 1;
-    }
-    50% {
-      opacity: 0.6;
-    }
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
   }
-  .anim-float {
-    animation: float 6s ease-in-out infinite;
+  @keyframes pop-in {
+    0% { opacity: 0; transform: translateY(8px) scale(0.97); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
   }
-  .anim-wave {
-    animation: wave 2.5s ease-in-out infinite;
-    transform-origin: 70% 70%;
+  @keyframes wiggle {
+    0%, 100% { transform: rotate(0deg); }
+    30% { transform: rotate(-4deg); }
+    60% { transform: rotate(4deg); }
   }
-  .anim-pulse-soft {
-    animation: pulse-soft 2s ease-in-out infinite;
+  @keyframes bob {
+    0%, 100% { transform: translateY(0) rotate(-2deg); }
+    50% { transform: translateY(-4px) rotate(2deg); }
   }
+
+  .anim-float { animation: float 6s ease-in-out infinite; }
+  .anim-wave { animation: wave 2.5s ease-in-out infinite; transform-origin: 70% 70%; }
+  .anim-pulse-soft { animation: pulse-soft 2s ease-in-out infinite; }
+  .anim-bob { animation: bob 4s ease-in-out infinite; }
+  .anim-pop { animation: pop-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+  /* Stagger children of a grid/list so sections arrive rather than appear. */
+  .anim-stagger > * { animation: pop-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+  .anim-stagger > *:nth-child(1) { animation-delay: 0.02s; }
+  .anim-stagger > *:nth-child(2) { animation-delay: 0.08s; }
+  .anim-stagger > *:nth-child(3) { animation-delay: 0.14s; }
+  .anim-stagger > *:nth-child(4) { animation-delay: 0.20s; }
+  .anim-stagger > *:nth-child(5) { animation-delay: 0.26s; }
+  .anim-stagger > *:nth-child(6) { animation-delay: 0.32s; }
+
+  .hover-lift { transition: transform 0.18s ease, box-shadow 0.18s ease; }
+  .hover-lift:hover { transform: translateY(-3px); box-shadow: var(--shadow-soft); }
+  .hover-wiggle:hover { animation: wiggle 0.4s ease-in-out; }
 }

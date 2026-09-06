@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireActiveUser } from "@/lib/session";
-import { isPremiumEnabled } from "@/lib/premium";
 import { signOutAction } from "@/app/auth-actions";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +13,7 @@ const links = [
   { href: "/dashboard/orders", label: "Orders" },
   { href: "/dashboard/messages", label: "Messages" },
   { href: "/dashboard/settings", label: "Settings" },
-  ...(isPremiumEnabled() ? [{ href: "/dashboard/subscription", label: "Subscription" }] : []),
+  { href: "/dashboard/subscription", label: "Plus" },
 ];
 
 export default async function DashboardLayout({

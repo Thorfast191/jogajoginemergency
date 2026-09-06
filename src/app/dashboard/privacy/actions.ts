@@ -51,3 +51,35 @@ export async function updatePrivacyAction(
   revalidatePath("/dashboard");
   return { ok: true };
 }
+
+/**
+ * Portfolio visibility (bio, links).
+ *
+ * Deliberately outside the preset system: presets describe how much emergency
+ * information you publish, and folding two optional-extra switches into them
+ * would change what MINIMAL/STANDARD/FULL mean.
+ */
+export async function updatePortfolioVisibilityAction(input: {
+  field: "bioPublic" | "linksPublic";
+  value: boolean;
+}): Promise<{ error?: string; ok?: boolean }> {
+  let user;
+  try {
+    user = await requireCustomer();
+  } catch {
+    return { error: "Not authorized." };
+  }
+
+  if (input.field !== "bioPublic" && input.field !== "linksPublic") {
+    return { error: "Invalid field." };
+  }
+
+  await ensureProfile(user.id);
+  await prisma.emergencyProfile.update({
+    where: { userId: user.id },
+    data: { [input.field]: Boolean(input.value) },
+  });
+
+  revalidatePath("/dashboard/privacy");
+  return { ok: true };
+}

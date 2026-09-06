@@ -6,6 +6,7 @@ import { requireCustomer } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { checkoutSchema } from "@/lib/validations";
 import { generateOrderNumber, allocateTags } from "@/lib/order";
+import { readCart, resolveCart, writeCart } from "@/lib/cart-server";
 
 export type CheckoutState = { error?: string };
 
@@ -22,8 +23,6 @@ export async function createOrderAction(
 
   const parsed = checkoutSchema.safeParse({
     idempotencyKey: formData.get("idempotencyKey"),
-    productSlug: formData.get("productSlug"),
-    quantity: formData.get("quantity"),
     shipName: formData.get("shipName") || null,
     shipPhone: formData.get("shipPhone") || null,
     shipAddress: formData.get("shipAddress") || null,
@@ -32,16 +31,16 @@ export async function createOrderAction(
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
 
-  const product = await prisma.product.findUnique({ where: { slug: parsed.data.productSlug } });
-  if (!product || product.status !== "ACTIVE") return { error: "That product isn't available." };
+  // Prices come from the database via resolveCart, never from the form or the
+  // cookie: the cart carries slugs and quantities and nothing else.
+  const cart = await resolveCart(await readCart());
+  if (cart.lines.length === 0) return { error: "Your cart is empty." };
 
-  const qty = parsed.data.quantity;
-  const total = product.priceCents * qty;
   const { idempotencyKey } = parsed.data;
 
   // A resubmitted form (double-click, back-then-forward, a flaky connection
   // retrying the POST) must not place a second order, take a second payment,
-  // and burn two more tags out of inventory.
+  // and burn more tags out of inventory.
   const replay = await findOwnOrderByKey(idempotencyKey, user.id);
   if (replay) redirect(`/checkout/success?order=${replay}`);
 
@@ -62,9 +61,9 @@ export async function createOrderAction(
           idempotencyKey,
           userId: user.id,
           status: "PENDING",
-          subtotalCents: total,
-          totalCents: total,
-          currency: product.currency,
+          subtotalCents: cart.totalCents,
+          totalCents: cart.totalCents,
+          currency: cart.currency,
           shipName: parsed.data.shipName ?? null,
           shipPhone: parsed.data.shipPhone ?? null,
           shipAddress: parsed.data.shipAddress ?? null,
@@ -73,28 +72,37 @@ export async function createOrderAction(
         },
       });
 
-      const item = await tx.orderItem.create({
-        data: {
-          orderId: order.id,
-          productId: product.id,
-          quantity: qty,
-          unitPriceCents: product.priceCents,
-          currency: product.currency,
-        },
-      });
+      for (const line of cart.lines) {
+        const item = await tx.orderItem.create({
+          data: {
+            orderId: order.id,
+            productId: line.productId,
+            quantity: line.qty,
+            unitPriceCents: line.unitPriceCents,
+            currency: line.currency,
+          },
+        });
 
-      const tagIds = await allocateTags(tx, {
-        productId: product.id,
-        orderItemId: item.id,
-        quantity: qty,
-      });
+        const tagIds = await allocateTags(tx, {
+          productId: line.productId,
+          orderItemId: item.id,
+          quantity: line.qty,
+        });
+
+        // The sticker's own theme becomes the scan page's starting skin. A
+        // subscriber can change it later from the dashboard.
+        await tx.tag.updateMany({
+          where: { id: { in: tagIds } },
+          data: { userId: user.id, status: "ACTIVE", themeId: line.themeId },
+        });
+      }
 
       await tx.payment.create({
         data: {
           kind: "ORDER",
           orderId: order.id,
-          amountCents: total,
-          currency: product.currency,
+          amountCents: cart.totalCents,
+          currency: cart.currency,
           provider: "DEMO",
           status: "SUCCEEDED",
           providerRef: `demo_${Date.now()}`,
@@ -106,17 +114,12 @@ export async function createOrderAction(
         data: { status: "PAID", placedAt: new Date() },
       });
 
-      await tx.tag.updateMany({
-        where: { id: { in: tagIds } },
-        data: { userId: user.id, status: "ACTIVE" },
-      });
-
       return number;
     });
   } catch (e) {
     if (e instanceof Error && e.message === "OUT_OF_STOCK") {
-      console.warn(`[checkout] out of stock: product=${product.slug} qty=${qty}`);
-      return { error: "Sorry, that product just sold out. We're restocking — please check back." };
+      console.warn(`[checkout] out of stock: ${cart.lines.map((l) => l.slug).join(",")}`);
+      return { error: "Sorry, one of those just sold out. We're restocking — please check back." };
     }
     // Two submits of the same form raced and the other one won. Whether the
     // clash was on our key (rather than the retried order number) is settled
@@ -130,6 +133,7 @@ export async function createOrderAction(
     }
   }
 
+  await writeCart([]);
   redirect(`/checkout/success?order=${orderNumber}`);
 }
 

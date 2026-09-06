@@ -224,7 +224,12 @@ describe("the safety invariant: a lapsed subscription never hides medical data",
   it("returns identical emergency fields entitled and unentitled", () => {
     const free = buildPublicProfileView(everythingPublic, [contact], [], { lost: false, entitled: false });
     const paid = buildPublicProfileView(everythingPublic, [contact], [], { lost: false, entitled: true });
-    const emergencyOnly = ({ bio: _b, links: _l, ...rest }: typeof free) => rest;
+    const emergencyOnly = (v: typeof free) => {
+      const copy: Record<string, unknown> = { ...v };
+      delete copy.bio;
+      delete copy.links;
+      return copy;
+    };
     expect(emergencyOnly(free)).toEqual(emergencyOnly(paid));
   });
 });

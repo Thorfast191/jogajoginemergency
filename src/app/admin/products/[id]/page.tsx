@@ -16,7 +16,14 @@ export default async function AdminProductDetailPage({
   if (!(await getAdmin())) redirect("/dashboard");
   const { id } = await params;
 
-  const product = await prisma.product.findUnique({ where: { id } });
+  const [product, themes] = await Promise.all([
+    prisma.product.findUnique({ where: { id } }),
+    prisma.theme.findMany({
+      where: { status: "ACTIVE" },
+      orderBy: [{ tier: "asc" }, { sortOrder: "asc" }],
+      select: { id: true, name: true, tier: true },
+    }),
+  ]);
   if (!product) notFound();
 
   return (
@@ -32,6 +39,7 @@ export default async function AdminProductDetailPage({
         </div>
         <div className="space-y-8">
           <ProductForm
+            themes={themes}
             product={{
               id: product.id,
               slug: product.slug,
@@ -43,6 +51,7 @@ export default async function AdminProductDetailPage({
               currency: product.currency,
               status: product.status,
               sortOrder: product.sortOrder,
+              themeId: product.themeId,
             }}
           />
           {product.status !== "ARCHIVED" && <ArchiveButton productId={product.id} />}

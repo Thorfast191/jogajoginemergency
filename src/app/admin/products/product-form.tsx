@@ -16,9 +16,18 @@ type Product = {
   currency: string;
   status: string;
   sortOrder: number;
+  themeId: string | null;
 };
 
-export function ProductForm({ product }: { product?: Product }) {
+type ThemeOption = { id: string; name: string; tier: string };
+
+export function ProductForm({
+  product,
+  themes = [],
+}: {
+  product?: Product;
+  themes?: ThemeOption[];
+}) {
   const action = product ? updateProductAction.bind(null, product.id) : createProductAction;
   const [state, formAction, pending] = useActionState<ProductState, FormData>(action, initial);
 
@@ -83,6 +92,21 @@ export function ProductForm({ product }: { product?: Product }) {
       </div>
       <label className="text-sm block">
         Status
+        <label className="text-sm block">
+          Theme
+          <select name="themeId" defaultValue={product?.themeId ?? ""} className={field}>
+            <option value="">No theme</option>
+            {themes.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+                {t.tier === "PREMIUM" ? " (Plus skin)" : ""}
+              </option>
+            ))}
+          </select>
+          <span className="mt-1 block text-xs text-black/40">
+            Sets the printed artwork and the starting scan-page skin for tags sold as this product.
+          </span>
+        </label>
         <select name="status" defaultValue={product?.status ?? "DRAFT"} className={field}>
           <option value="DRAFT">Draft</option>
           <option value="ACTIVE">Active</option>

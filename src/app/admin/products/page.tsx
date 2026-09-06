@@ -15,6 +15,12 @@ export default async function AdminProductsPage() {
     include: { _count: { select: { tags: true } } },
   });
 
+  const themes = await prisma.theme.findMany({
+    where: { status: "ACTIVE" },
+    orderBy: [{ tier: "asc" }, { sortOrder: "asc" }],
+    select: { id: true, name: true, tier: true },
+  });
+
   return (
     <div>
       <h1 className="text-2xl font-bold">Products</h1>
@@ -68,7 +74,7 @@ export default async function AdminProductsPage() {
 
       <div className="mt-8">
         <h2 className="font-semibold mb-3">New product</h2>
-        <ProductForm />
+        <ProductForm themes={themes} />
       </div>
     </div>
   );

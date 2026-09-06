@@ -3,7 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { requireCustomer } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { emergencyProfileSchema, emergencyContactSchema } from "@/lib/validations";
+import {
+  emergencyProfileSchema,
+  emergencyContactSchema,
+  profileLinkSchema,
+  bioSchema,
+} from "@/lib/validations";
 import { PRESET_FLAGS } from "@/lib/privacy";
 import { processImage, MediaError } from "@/lib/media";
 
@@ -277,4 +282,89 @@ export async function deleteProfilePhotoAction(): Promise<PhotoState> {
 
   revalidateProfileViews();
   return { success: true };
+}
+
+// --- Portfolio (Plus) ------------------------------------------------------
+// Bio and links only ever reach the scan page through buildPublicProfileView,
+// which drops them entirely when the subscription has lapsed. Editing them
+// while unsubscribed is allowed on purpose: the data is the owner's, it simply
+// isn't published until they subscribe again.
+
+export type LinkState = { error?: string; success?: boolean };
+
+const MAX_LINKS = 6;
+
+export async function updateBioAction(
+  _prev: LinkState,
+  formData: FormData,
+): Promise<LinkState> {
+  let user;
+  try {
+    user = await requireCustomer();
+  } catch {
+    return { error: "Not authorized." };
+  }
+
+  const parsed = bioSchema.safeParse({ bio: formData.get("bio") || null });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+
+  const profile = await ensureProfile(user.id);
+  await prisma.emergencyProfile.update({
+    where: { id: profile.id },
+    data: { bio: parsed.data.bio?.trim() || null },
+  });
+
+  revalidatePath("/dashboard/profile");
+  revalidatePath("/dashboard/privacy");
+  return { success: true };
+}
+
+function parseLink(formData: FormData) {
+  return profileLinkSchema.safeParse({
+    label: formData.get("label"),
+    url: formData.get("url"),
+    isPublic: formData.get("isPublic") === "on",
+  });
+}
+
+export async function addLinkAction(_prev: LinkState, formData: FormData): Promise<LinkState> {
+  let user;
+  try {
+    user = await requireCustomer();
+  } catch {
+    return { error: "Not authorized." };
+  }
+
+  const profile = await ensureProfile(user.id);
+  const count = await prisma.profileLink.count({ where: { profileId: profile.id } });
+  if (count >= MAX_LINKS) return { error: `You can add up to ${MAX_LINKS} links.` };
+
+  const parsed = parseLink(formData);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+
+  await prisma.profileLink.create({
+    data: {
+      profileId: profile.id,
+      label: parsed.data.label,
+      url: parsed.data.url.trim(),
+      isPublic: parsed.data.isPublic,
+      sortOrder: count,
+    },
+  });
+
+  revalidatePath("/dashboard/profile");
+  revalidatePath("/dashboard/privacy");
+  return { success: true };
+}
+
+export async function deleteLinkAction(linkId: string) {
+  const user = await requireCustomer();
+
+  // Scoped through the profile so one customer cannot delete another's link.
+  await prisma.profileLink.deleteMany({
+    where: { id: linkId, profile: { userId: user.id } },
+  });
+
+  revalidatePath("/dashboard/profile");
+  revalidatePath("/dashboard/privacy");
 }

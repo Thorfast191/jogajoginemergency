@@ -18,6 +18,85 @@ function placeholderSvg(label: string, accent: string): string {
   </svg>`;
 }
 
+// --- Themes ---------------------------------------------------------------
+// Every theme here is original. They read as archetypes — a night guardian, a
+// web-slinger, a speedster — without copying any licensed character's
+// likeness, name or costume. If real characters are ever licensed, add rows.
+const THEMES = [
+  {
+    slug: "classic",
+    name: "Classic",
+    tagline: "Calm, clear and unmistakably Jogajog.",
+    tier: "FREE" as const,
+    bgColor: "#FBF9F6",
+    surfaceColor: "#FFFFFF",
+    inkColor: "#171717",
+    accentColor: "#0F9D76",
+    mascot: "BLOB",
+    sortOrder: 1,
+  },
+  {
+    slug: "sunrise",
+    name: "Sunrise",
+    tagline: "Warm and cheerful, for everyday things.",
+    tier: "FREE" as const,
+    bgColor: "#FFF7ED",
+    surfaceColor: "#FFFFFF",
+    inkColor: "#1F2937",
+    accentColor: "#EA580C",
+    mascot: "BLOB",
+    sortOrder: 2,
+  },
+  {
+    slug: "night-guardian",
+    name: "Night Guardian",
+    tagline: "Caped, watchful, and a little dramatic.",
+    tier: "PREMIUM" as const,
+    bgColor: "#111827",
+    surfaceColor: "#1F2937",
+    inkColor: "#F9FAFB",
+    accentColor: "#FBBF24",
+    mascot: "GUARDIAN",
+    sortOrder: 3,
+  },
+  {
+    slug: "web-slinger",
+    name: "Web Slinger",
+    tagline: "Bold red and blue, with a knack for catching things.",
+    tier: "PREMIUM" as const,
+    bgColor: "#FEF2F2",
+    surfaceColor: "#FFFFFF",
+    inkColor: "#1F2937",
+    accentColor: "#DC2626",
+    mascot: "WEBBED",
+    sortOrder: 4,
+  },
+  {
+    slug: "speedster",
+    name: "Speedster",
+    tagline: "For things that move faster than you do.",
+    tier: "PREMIUM" as const,
+    bgColor: "#FEFCE8",
+    surfaceColor: "#FFFFFF",
+    inkColor: "#1F2937",
+    accentColor: "#CA8A04",
+    mascot: "SPARK",
+    sortOrder: 5,
+  },
+  {
+    slug: "good-boy",
+    name: "Good Boy",
+    tagline: "A loyal companion for collars and kit bags.",
+    tier: "FREE" as const,
+    bgColor: "#F0F9FF",
+    surfaceColor: "#FFFFFF",
+    inkColor: "#0C4A6E",
+    accentColor: "#0284C7",
+    mascot: "ROVER",
+    sortOrder: 6,
+  },
+];
+
 const PRODUCTS = [
   {
     slug: "bike-sticker",
@@ -29,6 +108,7 @@ const PRODUCTS = [
     priceCents: 29900,
     sortOrder: 1,
     accent: "#059669",
+    themeSlug: "classic",
   },
   {
     slug: "car-sticker",
@@ -40,6 +120,7 @@ const PRODUCTS = [
     priceCents: 34900,
     sortOrder: 2,
     accent: "#0EA5E9",
+    themeSlug: "sunrise",
   },
   {
     slug: "luggage-sticker",
@@ -51,6 +132,7 @@ const PRODUCTS = [
     priceCents: 24900,
     sortOrder: 3,
     accent: "#F98A6B",
+    themeSlug: "web-slinger",
   },
   {
     slug: "helmet-sticker",
@@ -62,42 +144,37 @@ const PRODUCTS = [
     priceCents: 29900,
     sortOrder: 4,
     accent: "#8B5CF6",
+    themeSlug: "night-guardian",
   },
 ];
 
 async function main() {
-  const plans = [
-    {
-      slug: "basic",
-      name: "Basic",
-      priceCents: 29900,
-      maxTags: 2,
-      features: ["Scan notifications by email", "Masked contact relay"],
-    },
-    {
-      slug: "standard",
-      name: "Standard",
-      priceCents: 59900,
-      maxTags: 5,
-      features: ["Scan notifications by email + SMS", "Masked contact relay", "Scan location history"],
-    },
-    {
-      slug: "premium",
-      name: "Premium",
-      priceCents: 99900,
-      maxTags: 15,
+  // One paid tier. It unlocks presentation features only — see
+  // src/lib/entitlements.ts for what that does and does not cover.
+  await prisma.subscriptionPlan.upsert({
+    where: { slug: "plus" },
+    update: {},
+    create: {
+      slug: "plus",
+      name: "Plus",
+      priceCents: 49900,
+      currency: "BDT",
       features: [
-        "Priority scan notifications",
-        "Masked contact relay",
-        "Scan location history",
-        "Priority support",
+        "Portfolio (bio + links) on your scan page",
+        "Every premium theme",
+        "Full scan history",
       ],
     },
-  ];
+  });
 
-  for (const plan of plans) {
-    await prisma.subscriptionPlan.upsert({ where: { slug: plan.slug }, update: plan, create: plan });
+  for (const t of THEMES) {
+    await prisma.theme.upsert({
+      where: { slug: t.slug },
+      update: t,
+      create: { ...t, status: "ACTIVE" },
+    });
   }
+  console.log(`Seeded ${THEMES.length} themes.`);
 
   const adminEmail = "admin@jogajog.app";
   const existingAdmin = await prisma.user.findUnique({ where: { email: adminEmail } });
@@ -134,6 +211,8 @@ async function main() {
       imageAssetId = asset.id;
     }
 
+    const theme = await prisma.theme.findUnique({ where: { slug: p.themeSlug } });
+
     const data = {
       name: p.name,
       tagline: p.tagline,
@@ -144,6 +223,7 @@ async function main() {
       status: "ACTIVE" as const,
       sortOrder: p.sortOrder,
       imageAssetId,
+      themeId: theme?.id ?? null,
     };
     await prisma.product.upsert({ where: { slug: p.slug }, update: data, create: { slug: p.slug, ...data } });
   }

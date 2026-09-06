@@ -14,6 +14,7 @@ const sections: { heading: string; links: { href: string; label: string }[] }[] 
     heading: "Store",
     links: [
       { href: "/admin/products", label: "Products" },
+      { href: "/admin/themes", label: "Themes" },
       { href: "/admin/orders", label: "Orders" },
     ],
   },

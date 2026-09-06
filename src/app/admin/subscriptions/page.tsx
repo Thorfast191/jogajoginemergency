@@ -52,7 +52,9 @@ export default async function AdminSubscriptionsPage() {
                   </td>
                   <td className="py-3 px-4">
                     {s.plan.name}
-                    <div className="text-xs text-black/40">{s.plan.maxTags} tags</div>
+                    <div className="text-xs text-black/40">
+                      {(s.plan.priceCents / 100).toLocaleString()} {s.plan.currency}/yr
+                    </div>
                   </td>
                   <td className="py-3 px-4">{s.status}</td>
                   <td className="py-3 px-4">{s.provider}</td>

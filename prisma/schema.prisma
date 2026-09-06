@@ -169,7 +169,9 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-// --- Optional premium tier (dormant; gated by PREMIUM_ENABLED) -------------
+// --- Plus tier ------------------------------------------------------------
+// Unlocks the portfolio layer, premium themes and full scan history. It never
+// gates emergency information — see src/lib/entitlements.ts.
 
 model SubscriptionPlan {
   id         String   @id @default(cuid())
@@ -177,7 +179,6 @@ model SubscriptionPlan {
   name       String
   priceCents Int
   currency   String   @default("BDT")
-  maxTags    Int
   features   String[]
   isActive   Boolean  @default(true)
   createdAt  DateTime @default(now())

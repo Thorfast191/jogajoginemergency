@@ -71,27 +71,3 @@ export function removeLine(lines: CartLine[], slug: string): CartLine[] {
 export function cartCount(lines: CartLine[]): number {
   return lines.reduce((n, l) => n + l.qty, 0);
 }
-
-// --- Buy-now deep links ---------------------------------------------------
-// `/checkout?product=<slug>&qty=<1..10>` still works: it seeds a single-line
-// cart rather than bypassing it.
-
-export type CheckoutParams = { productSlug: string; quantity: number };
-
-type ParamSource = URLSearchParams | Record<string, string | string[] | undefined>;
-
-function read(source: ParamSource, key: string): string | undefined {
-  if (source instanceof URLSearchParams) return source.get(key) ?? undefined;
-  const v = source[key];
-  return Array.isArray(v) ? v[0] : v;
-}
-
-export function parseCheckoutParams(source: ParamSource): CheckoutParams | null {
-  const productSlug = read(source, "product")?.trim();
-  if (!productSlug) return null;
-
-  const rawQty = Number.parseInt(read(source, "qty") ?? "", 10);
-  const quantity = Number.isNaN(rawQty) ? 1 : Math.min(MAX_QTY, Math.max(1, rawQty));
-
-  return { productSlug, quantity };
-}

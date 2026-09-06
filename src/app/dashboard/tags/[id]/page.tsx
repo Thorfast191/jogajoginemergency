@@ -5,13 +5,22 @@ import { prisma } from "@/lib/prisma";
 import { generateTagQrDataUrl, tagUrl } from "@/lib/qr";
 import { summarizeUserAgent } from "@/lib/user-agent";
 import { TagSettingsForm } from "./tag-settings-form";
+import { ThemePicker } from "./theme-picker";
+import { userIsEntitled } from "@/lib/subscription";
+import { FREE_SCAN_HISTORY } from "@/lib/entitlements";
+import type { ThemeSkin } from "@/lib/themes";
 
 export default async function TagDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const user = await getCustomer();
   if (!user) redirect("/login");
 
-  const [tag, scans, messages] = await Promise.all([
+  const entitled = await userIsEntitled(user.id);
+  // Free accounts see the most recent few scans; the rest is a paid extra.
+  // This is history, not safety — nothing here affects what a finder sees.
+  const scanTake = entitled ? 50 : FREE_SCAN_HISTORY;
+
+  const [tag, scans, scanTotal, messages, themes] = await Promise.all([
     prisma.tag.findFirst({
       where: { id, userId: user.id },
       include: { product: true, orderItem: { select: { orderId: true } } },
@@ -19,12 +28,17 @@ export default async function TagDetailPage({ params }: { params: Promise<{ id: 
     prisma.scanEvent.findMany({
       where: { tag: { id, userId: user.id } },
       orderBy: { scannedAt: "desc" },
-      take: 20,
+      take: scanTake,
     }),
+    prisma.scanEvent.count({ where: { tag: { id, userId: user.id } } }),
     prisma.relayMessage.findMany({
       where: { tag: { id, userId: user.id } },
       orderBy: { createdAt: "desc" },
       take: 20,
+    }),
+    prisma.theme.findMany({
+      where: { status: "ACTIVE" },
+      orderBy: [{ tier: "asc" }, { sortOrder: "asc" }],
     }),
   ]);
 
@@ -98,6 +112,14 @@ export default async function TagDetailPage({ params }: { params: Promise<{ id: 
                 ))}
               </ul>
             )}
+            {!entitled && scanTotal > scans.length && (
+              <p className="mt-3 rounded-xl bg-violet-50 px-3 py-2 text-xs text-violet-800">
+                Showing the last {scans.length} of {scanTotal} scans.{" "}
+                <Link href="/dashboard/subscription" className="font-semibold hover:underline">
+                  Plus unlocks full history →
+                </Link>
+              </p>
+            )}
           </div>
 
           <div className="mt-8">
@@ -127,6 +149,15 @@ export default async function TagDetailPage({ params }: { params: Promise<{ id: 
           <TagSettingsForm
             tag={{ id: tag.id, internalLabel: tag.internalLabel, status: tag.status }}
           />
+
+          <div className="mt-8">
+            <ThemePicker
+              tagId={tag.id}
+              themes={themes as (ThemeSkin & { id: string })[]}
+              currentThemeId={tag.themeId}
+              entitled={entitled}
+            />
+          </div>
           <p className="mt-4 text-xs text-black/50">
             What finders see comes from your{" "}
             <Link href="/dashboard/profile" className="text-emerald-700 hover:underline">

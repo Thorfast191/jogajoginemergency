@@ -18,6 +18,7 @@ function parse(formData: FormData) {
     useCase: formData.get("useCase") || null,
     priceCents: formData.get("priceCents"),
     currency: formData.get("currency") || "BDT",
+    themeId: formData.get("themeId") || null,
     status: formData.get("status"),
     sortOrder: formData.get("sortOrder") || 0,
   });

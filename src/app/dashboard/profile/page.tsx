@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { ensureProfile } from "./actions";
 import { ProfileForm } from "./profile-form";
 import { ContactsEditor } from "./contacts-editor";
+import { PortfolioEditor } from "./portfolio-editor";
+import { userIsEntitled } from "@/lib/subscription";
 import { PhotoControls } from "./photo-controls";
 
 export const dynamic = "force-dynamic";
@@ -14,9 +16,13 @@ export default async function ProfilePage() {
   if (!user) redirect("/login");
 
   await ensureProfile(user.id);
+  const entitled = await userIsEntitled(user.id);
   const profile = await prisma.emergencyProfile.findUniqueOrThrow({
     where: { userId: user.id },
-    include: { contacts: { orderBy: { sortOrder: "asc" } } },
+    include: {
+      contacts: { orderBy: { sortOrder: "asc" } },
+      links: { orderBy: { sortOrder: "asc" } },
+    },
   });
 
   return (
@@ -65,6 +71,24 @@ export default async function ProfilePage() {
             email: c.email,
             isPublic: c.isPublic,
           }))}
+        />
+      </div>
+
+      <div className="mt-10 max-w-lg">
+        <h2 className="font-semibold">Portfolio</h2>
+        <p className="mt-1 mb-3 text-sm text-black/60">
+          The optional half of your scan page — a line about you and where to find you. Emergency
+          details above are always shown; this part needs Plus.
+        </p>
+        <PortfolioEditor
+          bio={profile.bio}
+          links={profile.links.map((l) => ({
+            id: l.id,
+            label: l.label,
+            url: l.url,
+            isPublic: l.isPublic,
+          }))}
+          entitled={entitled}
         />
       </div>
     </div>

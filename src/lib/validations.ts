@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { MASCOTS } from "@/lib/themes";
 
 // --- Auth --------------------------------------------------------------
 
@@ -67,6 +68,32 @@ export const emergencyProfileSchema = z
     }
   });
 
+// Portfolio links are rendered as href on the public scan page, so the scheme
+// is restricted here as well as in the DTO. Two gates, because this one gives
+// the owner a useful error and the DTO one is the guarantee.
+export const profileLinkSchema = z.object({
+  label: z.string().min(1, "Give the link a label").max(40),
+  url: z
+    .string()
+    .min(1, "Enter a URL")
+    .max(500)
+    .refine(
+      (v) => {
+        try {
+          return ["http:", "https:"].includes(new URL(v.trim()).protocol);
+        } catch {
+          return false;
+        }
+      },
+      { message: "Enter a full http:// or https:// address" },
+    ),
+  isPublic: z.boolean(),
+});
+
+export const bioSchema = z.object({
+  bio: z.string().max(280).optional().nullable(),
+});
+
 export const emergencyContactSchema = z.object({
   name: z.string().min(1, "Name is required").max(80),
   relation: z.string().max(40).optional().nullable(),
@@ -103,8 +130,6 @@ export const checkoutSchema = z.object({
   // Minted per rendered checkout form; Order.idempotencyKey is unique, so a
   // resubmit of the same form returns the original order.
   idempotencyKey: z.string().min(8).max(64),
-  productSlug: z.string().min(1),
-  quantity: z.coerce.number().int().min(1).max(10),
   shipName: z.string().max(200).optional().nullable(),
   shipPhone: z.string().max(200).optional().nullable(),
   shipAddress: z.string().max(200).optional().nullable(),
@@ -130,6 +155,33 @@ export const productSchema = z.object({
   useCase: z.string().max(500).optional().nullable(),
   priceCents: z.coerce.number().int().min(0),
   currency: z.string().min(1).max(8).default("BDT"),
+  themeId: z.string().optional().nullable(),
+  status: z.enum(["DRAFT", "ACTIVE", "ARCHIVED"]),
+  sortOrder: z.coerce.number().int().min(0).max(9999),
+});
+
+const HEX_COLOR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
+const hexColor = (fallback: string) =>
+  z
+    .string()
+    .trim()
+    .regex(HEX_COLOR, "Use a hex colour like #1A2B3C")
+    .default(fallback);
+
+export const themeSchema = z.object({
+  slug: z
+    .string()
+    .min(2)
+    .max(40)
+    .regex(/^[a-z0-9-]+$/, "Lowercase letters, digits and hyphens only"),
+  name: z.string().min(2).max(60),
+  tagline: z.string().min(2).max(140),
+  tier: z.enum(["FREE", "PREMIUM"]),
+  bgColor: hexColor("#FBF9F6"),
+  surfaceColor: hexColor("#FFFFFF"),
+  inkColor: hexColor("#171717"),
+  accentColor: hexColor("#059669"),
+  mascot: z.enum(MASCOTS),
   status: z.enum(["DRAFT", "ACTIVE", "ARCHIVED"]),
   sortOrder: z.coerce.number().int().min(0).max(9999),
 });
