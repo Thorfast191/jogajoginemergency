@@ -25,6 +25,9 @@ export type EmergencyProfileInput = {
   medicalNotesPublic: boolean;
   contactsPublic: boolean;
   showPhone: boolean;
+  bio?: string | null;
+  bioPublic?: boolean;
+  linksPublic?: boolean;
 };
 
 export type EmergencyContactInput = {
@@ -35,6 +38,15 @@ export type EmergencyContactInput = {
   isPublic: boolean;
   sortOrder: number;
 };
+
+export type ProfileLinkInput = {
+  label: string;
+  url: string;
+  isPublic: boolean;
+  sortOrder: number;
+};
+
+export type PublicLink = { label: string; url: string };
 
 export type PublicContact = {
   name: string;
@@ -55,14 +67,30 @@ export type PublicProfileView = {
   contactMode: ContactMode;
   phonePublic: string | null;
   contacts: PublicContact[];
+  bio: string | null;
+  links: PublicLink[];
 };
 
 const ANON_NAME = "Someone's belongings";
 
+// Link URLs are typed by the owner and rendered as href on a page strangers
+// open. Only http(s) is ever emitted — `javascript:` and `data:` would both be
+// script execution in a finder's browser.
+const SAFE_SCHEMES = new Set(["http:", "https:"]);
+
+export function isSafeLinkUrl(raw: string): boolean {
+  try {
+    return SAFE_SCHEMES.has(new URL(raw.trim()).protocol);
+  } catch {
+    return false;
+  }
+}
+
 export function buildPublicProfileView(
   profile: EmergencyProfileInput,
   contacts: EmergencyContactInput[],
-  opts: { lost: boolean },
+  links: ProfileLinkInput[],
+  opts: { lost: boolean; entitled: boolean },
 ): PublicProfileView {
   const contactMode: ContactMode = profile.contactMode === "DIRECT_CALL" ? "DIRECT_CALL" : "RELAY";
 
@@ -79,6 +107,17 @@ export function buildPublicProfileView(
         .map((c) => ({ name: c.name, relation: c.relation, phone: c.phone, email: c.email }))
     : [];
 
+  // The portfolio layer is the only part of this view a subscription gates.
+  // Everything below it — name, photo, message, medical fields, contacts — is
+  // free forever, so a lapsed card never hides anything a responder needs.
+  const publicLinks: PublicLink[] =
+    opts.entitled && profile.linksPublic !== false
+      ? [...links]
+          .filter((l) => l.isPublic && isSafeLinkUrl(l.url))
+          .sort((a, b) => a.sortOrder - b.sortOrder)
+          .map((l) => ({ label: l.label, url: l.url.trim() }))
+      : [];
+
   return {
     lost: opts.lost,
     displayName,
@@ -92,5 +131,7 @@ export function buildPublicProfileView(
     phonePublic:
       profile.showPhone && contactMode === "DIRECT_CALL" ? profile.phonePublic : null,
     contacts: publicContacts,
+    bio: opts.entitled && profile.bioPublic ? (profile.bio ?? null) : null,
+    links: publicLinks,
   };
 }

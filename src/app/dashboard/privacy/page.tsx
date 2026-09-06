@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getCustomer } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { buildPublicProfileView } from "@/lib/public-profile";
+import { userIsEntitled } from "@/lib/subscription";
 import { FLAG_NAMES, type VisibilityFlags } from "@/lib/privacy";
 import { PublicProfileCard } from "@/components/public-profile-card";
 import { ensureProfile } from "@/app/dashboard/profile/actions";
@@ -17,14 +18,23 @@ export default async function PrivacyPage() {
   await ensureProfile(user.id);
   const profile = await prisma.emergencyProfile.findUniqueOrThrow({
     where: { userId: user.id },
-    include: { contacts: { orderBy: { sortOrder: "asc" } } },
+    include: {
+      contacts: { orderBy: { sortOrder: "asc" } },
+      links: { orderBy: { sortOrder: "asc" } },
+    },
   });
 
   const flags = Object.fromEntries(
     FLAG_NAMES.map((k) => [k, profile[k]]),
   ) as unknown as VisibilityFlags;
 
-  const view = buildPublicProfileView(profile, profile.contacts, { lost: false });
+  // The preview must show what a finder would really see, so it runs through
+  // the same DTO with the account's real entitlement rather than assuming paid.
+  const entitled = await userIsEntitled(user.id);
+  const view = buildPublicProfileView(profile, profile.contacts, profile.links, {
+    lost: false,
+    entitled,
+  });
 
   return (
     <div>

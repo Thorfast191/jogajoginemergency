@@ -21,6 +21,16 @@ describe("resolveMediaAccess — product images", () => {
   });
 });
 
+describe("resolveMediaAccess — theme artwork", () => {
+  const themeArt: MediaAssetRef = { kind: "THEME_ART", ownerId: null };
+
+  it("is catalogue content: public and immutable like a product image", () => {
+    const access = resolveMediaAccess(themeArt, { publiclyVisible: false, viewer: null });
+    expect(access.allowed).toBe(true);
+    expect(access.allowed && access.cacheControl).toBe("public, max-age=31536000, immutable");
+  });
+});
+
 describe("resolveMediaAccess — published profile photos", () => {
   const published = { publiclyVisible: true, viewer: null };
 

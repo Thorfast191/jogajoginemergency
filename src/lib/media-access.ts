@@ -5,7 +5,7 @@
 // (the asset's kind/owner, and whether a profile currently publishes it)
 // and then do exactly what this returns.
 
-export type MediaKind = "PROFILE_PHOTO" | "PRODUCT_IMAGE";
+export type MediaKind = "PROFILE_PHOTO" | "PRODUCT_IMAGE" | "THEME_ART";
 
 export type MediaAssetRef = {
   kind: MediaKind;
@@ -37,7 +37,8 @@ export function resolveMediaAccess(
   asset: MediaAssetRef,
   { publiclyVisible, viewer }: { publiclyVisible: boolean; viewer: Viewer },
 ): MediaAccess {
-  if (asset.kind === "PRODUCT_IMAGE") {
+  // Catalogue content: identical for every visitor, and meant to be seen.
+  if (asset.kind === "PRODUCT_IMAGE" || asset.kind === "THEME_ART") {
     return { allowed: true, cacheControl: PUBLIC_IMMUTABLE, varyOnCookie: false };
   }
 

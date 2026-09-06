@@ -93,9 +93,15 @@ enum VisibilityPreset {
   CUSTOM
 }
 
+enum ThemeTier {
+  FREE
+  PREMIUM
+}
+
 enum MediaKind {
   PROFILE_PHOTO
   PRODUCT_IMAGE
+  THEME_ART
 }
 
 model User {
@@ -198,6 +204,40 @@ model Subscription {
 
 // --- Physical product store ----------------------------------------------
 
+// A theme spans two surfaces: the artwork printed on a sticker (via Product)
+// and the skin the scan page renders in (via Tag). Deliberately
+// character-agnostic — a theme is a name, a palette, a mascot key and an
+// artwork asset, so no third-party character is referenced in code or seed
+// data. Licensed characters, if ever licensed, are added as rows.
+model Theme {
+  id      String    @id @default(cuid())
+  slug    String    @unique
+  name    String
+  tagline String
+  tier    ThemeTier @default(FREE)
+
+  // Scan-page skin tokens. Explicit columns rather than a JSON blob so the
+  // admin form and the renderer share one typed contract, and a malformed
+  // theme cannot reach the scan page.
+  bgColor      String @default("#FBF9F6")
+  surfaceColor String @default("#FFFFFF")
+  inkColor     String @default("#171717")
+  accentColor  String @default("#059669")
+
+  mascot     String        @default("BLOB")
+  artAssetId String?
+  status     ProductStatus @default(ACTIVE)
+  sortOrder  Int           @default(0)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  artAsset MediaAsset? @relation("ThemeArt", fields: [artAssetId], references: [id])
+  products Product[]
+  tags     Tag[]
+
+  @@index([status, sortOrder])
+}
+
 model Product {
   id           String        @id @default(cuid())
   slug         String        @unique
@@ -208,12 +248,14 @@ model Product {
   priceCents   Int
   currency     String        @default("BDT")
   imageAssetId String?
+  themeId      String?
   status       ProductStatus @default(DRAFT)
   sortOrder    Int           @default(0)
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
   imageAsset MediaAsset? @relation("ProductImage", fields: [imageAssetId], references: [id])
+  theme      Theme?      @relation(fields: [themeId], references: [id])
   tags       Tag[]
   orderItems OrderItem[]
   batches    TagBatch[]
@@ -309,6 +351,10 @@ model Tag {
   batchId       String?
   orderItemId   String?
   userId        String?
+  // The scan page's skin. Copied from the product at allocation; a subscriber
+  // may re-skin it afterwards. Kept even while a subscription is lapsed so
+  // re-subscribing restores the look rather than losing it.
+  themeId       String?
   internalLabel String?
   status        TagStatus @default(UNASSIGNED)
   createdAt     DateTime  @default(now())
@@ -318,6 +364,7 @@ model Tag {
   batch         TagBatch?      @relation(fields: [batchId], references: [id])
   orderItem     OrderItem?     @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
   user          User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  theme         Theme?         @relation(fields: [themeId], references: [id])
   scanEvents    ScanEvent[]
   relayMessages RelayMessage[]
   abuseReports  AbuseReport[]
@@ -383,6 +430,7 @@ model EmergencyProfile {
   allergies          String?
   medicalNotes       String?
   emergencyMessage   String?
+  bio                String?
   contactMode        ContactMode      @default(RELAY)
   phonePublic        String?
   visibilityPreset   VisibilityPreset @default(STANDARD)
@@ -394,12 +442,30 @@ model EmergencyProfile {
   medicalNotesPublic Boolean          @default(false)
   contactsPublic     Boolean          @default(true)
   showPhone          Boolean          @default(false)
+  bioPublic          Boolean          @default(false)
+  linksPublic        Boolean          @default(true)
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
 
   user       User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   photoAsset MediaAsset?        @relation("ProfilePhoto", fields: [photoAssetId], references: [id])
   contacts   EmergencyContact[]
+  links      ProfileLink[]
+}
+
+// The portfolio layer: what a scan shows beyond the emergency essentials.
+// Subscription-gated — see src/lib/entitlements.ts.
+model ProfileLink {
+  id        String  @id @default(cuid())
+  profileId String
+  label     String
+  url       String
+  sortOrder Int     @default(0)
+  isPublic  Boolean @default(true)
+
+  profile EmergencyProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId])
 }
 
 model EmergencyContact {
@@ -432,6 +498,7 @@ model MediaAsset {
   owner         User?              @relation("MediaOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   profileUsages EmergencyProfile[] @relation("ProfilePhoto")
   productUsages Product[]          @relation("ProductImage")
+  themeUsages   Theme[]            @relation("ThemeArt")
 
   @@index([ownerId])
 }

@@ -31,7 +31,7 @@ const contact = {
 
 describe("buildPublicProfileView", () => {
   it("hides everything when all flags are false", () => {
-    const v = buildPublicProfileView(base, [contact], { lost: false });
+    const v = buildPublicProfileView(base, [contact], [], { lost: false, entitled: false });
     expect(v.displayName).toBe("Someone's belongings");
     expect(v.photoUrl).toBeNull();
     expect(v.hasPhoto).toBe(false);
@@ -44,7 +44,7 @@ describe("buildPublicProfileView", () => {
   });
 
   it("never leaks the real name when namePublic is false", () => {
-    const v = buildPublicProfileView({ ...base, messagePublic: true }, [], { lost: false });
+    const v = buildPublicProfileView({ ...base, messagePublic: true }, [], [], { lost: false, entitled: false });
     expect(JSON.stringify(v)).not.toContain("Arafat");
   });
 
@@ -52,7 +52,8 @@ describe("buildPublicProfileView", () => {
     const v = buildPublicProfileView(
       { ...base, namePublic: true, photoPublic: true, bloodGroupPublic: true },
       [],
-      { lost: true },
+      [],
+      { lost: true, entitled: false },
     );
     expect(v.displayName).toBe("Arafat Islam");
     expect(v.photoUrl).toBe("/media/media1");
@@ -64,10 +65,10 @@ describe("buildPublicProfileView", () => {
 
   it("phonePublic requires showPhone AND DIRECT_CALL", () => {
     expect(
-      buildPublicProfileView({ ...base, showPhone: true, contactMode: "RELAY" }, [], { lost: false }).phonePublic,
+      buildPublicProfileView({ ...base, showPhone: true, contactMode: "RELAY" }, [], [], { lost: false, entitled: false }).phonePublic,
     ).toBeNull();
     expect(
-      buildPublicProfileView({ ...base, showPhone: true, contactMode: "DIRECT_CALL" }, [], { lost: false })
+      buildPublicProfileView({ ...base, showPhone: true, contactMode: "DIRECT_CALL" }, [], [], { lost: false, entitled: false })
         .phonePublic,
     ).toBe("+880123");
   });
@@ -76,7 +77,8 @@ describe("buildPublicProfileView", () => {
     const v = buildPublicProfileView(
       { ...base, contactsPublic: true },
       [contact, { ...contact, name: "Secret", isPublic: false }],
-      { lost: false },
+      [],
+      { lost: false, entitled: false },
     );
     expect(v.contacts.map((c) => c.name)).toEqual(["Rahim"]);
   });
@@ -88,27 +90,141 @@ describe("buildPublicProfileView", () => {
         { ...contact, name: "Second", sortOrder: 2 },
         { ...contact, name: "First", sortOrder: 1 },
       ],
-      { lost: false },
+      [],
+      { lost: false, entitled: false },
     );
     expect(v.contacts.map((c) => c.name)).toEqual(["First", "Second"]);
   });
 
   it("emits a fixed key set with no account internals", () => {
-    const v = buildPublicProfileView(base, [], { lost: false });
+    const v = buildPublicProfileView(base, [], [], { lost: false, entitled: false });
     expect(Object.keys(v).sort()).toEqual(
       [
         "allergies",
+        "bio",
         "bloodGroup",
         "contactMode",
         "contacts",
         "displayName",
         "emergencyMessage",
         "hasPhoto",
+        "links",
         "lost",
         "medicalNotes",
         "phonePublic",
         "photoUrl",
       ].sort(),
     );
+  });
+});
+
+// --- Portfolio layer (subscription-gated) --------------------------------
+
+const link = { label: "Portfolio", url: "https://example.com", isPublic: true, sortOrder: 0 };
+const withBio = { ...base, bio: "Product designer in Dhaka", bioPublic: true, linksPublic: true };
+
+describe("buildPublicProfileView — portfolio", () => {
+  it("shows bio and links to an entitled owner who published them", () => {
+    const v = buildPublicProfileView(withBio, [], [link], { lost: false, entitled: true });
+    expect(v.bio).toBe("Product designer in Dhaka");
+    expect(v.links).toEqual([{ label: "Portfolio", url: "https://example.com" }]);
+  });
+
+  it("omits the portfolio entirely when the subscription has lapsed", () => {
+    const v = buildPublicProfileView(withBio, [], [link], { lost: false, entitled: false });
+    expect(v.bio).toBeNull();
+    expect(v.links).toEqual([]);
+  });
+
+  it("still respects the per-field flags even when entitled", () => {
+    const v = buildPublicProfileView(
+      { ...withBio, bioPublic: false, linksPublic: false },
+      [],
+      [link],
+      { lost: false, entitled: true },
+    );
+    expect(v.bio).toBeNull();
+    expect(v.links).toEqual([]);
+  });
+
+  it("drops individually private links", () => {
+    const v = buildPublicProfileView(
+      withBio,
+      [],
+      [link, { ...link, label: "Secret", url: "https://secret.example", isPublic: false }],
+      { lost: false, entitled: true },
+    );
+    expect(v.links.map((l) => l.label)).toEqual(["Portfolio"]);
+  });
+
+  it("orders links by sortOrder", () => {
+    const v = buildPublicProfileView(
+      withBio,
+      [],
+      [
+        { ...link, label: "Second", sortOrder: 2 },
+        { ...link, label: "First", sortOrder: 1 },
+      ],
+      { lost: false, entitled: true },
+    );
+    expect(v.links.map((l) => l.label)).toEqual(["First", "Second"]);
+  });
+});
+
+describe("buildPublicProfileView — link URLs are attacker-influenced", () => {
+  const publish = (url: string) =>
+    buildPublicProfileView(withBio, [], [{ ...link, url }], { lost: false, entitled: true }).links;
+
+  it("allows http and https", () => {
+    expect(publish("https://example.com")).toHaveLength(1);
+    expect(publish("http://example.com")).toHaveLength(1);
+  });
+
+  it("drops javascript:, data: and every other scheme", () => {
+    for (const url of [
+      "javascript:alert(1)",
+      "JavaScript:alert(1)",
+      "  javascript:alert(1)",
+      "data:text/html;base64,PHNjcmlwdD4=",
+      "vbscript:msgbox(1)",
+      "file:///etc/passwd",
+      "not a url at all",
+    ]) {
+      expect(publish(url)).toEqual([]);
+    }
+  });
+});
+
+describe("the safety invariant: a lapsed subscription never hides medical data", () => {
+  const everythingPublic = {
+    ...base,
+    bloodGroupPublic: true,
+    allergiesPublic: true,
+    medicalNotesPublic: true,
+    messagePublic: true,
+    namePublic: true,
+    photoPublic: true,
+    contactsPublic: true,
+  };
+
+  it("publishes every emergency field with no subscription at all", () => {
+    const v = buildPublicProfileView(everythingPublic, [contact], [], {
+      lost: false,
+      entitled: false,
+    });
+    expect(v.bloodGroup).toBe("O+");
+    expect(v.allergies).toBe("penicillin");
+    expect(v.medicalNotes).toBe("asthma");
+    expect(v.emergencyMessage).toBe("Please call my brother");
+    expect(v.displayName).toBe("Arafat Islam");
+    expect(v.photoUrl).toBe("/media/media1");
+    expect(v.contacts).toHaveLength(1);
+  });
+
+  it("returns identical emergency fields entitled and unentitled", () => {
+    const free = buildPublicProfileView(everythingPublic, [contact], [], { lost: false, entitled: false });
+    const paid = buildPublicProfileView(everythingPublic, [contact], [], { lost: false, entitled: true });
+    const emergencyOnly = ({ bio: _b, links: _l, ...rest }: typeof free) => rest;
+    expect(emergencyOnly(free)).toEqual(emergencyOnly(paid));
   });
 });
