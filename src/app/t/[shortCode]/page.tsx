@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
@@ -15,6 +16,14 @@ import { ThemeMascot } from "@/components/illustrations";
 import { ReportAbuseLink } from "./report-abuse-link";
 
 export const dynamic = "force-dynamic";
+
+// A scan page can carry someone's blood group, allergies and next of kin. It
+// is public because a stranger holding a found helmet has to reach it without
+// an account — but public is not the same as crawlable, and an emergency
+// profile indexed by a search engine is a privacy failure, not a feature.
+export const metadata: Metadata = {
+  robots: { index: false, follow: false, nocache: true },
+};
 
 export default async function ScanPage({ params }: { params: Promise<{ shortCode: string }> }) {
   const { shortCode } = await params;
@@ -147,9 +156,14 @@ function ScanLayout({ children, skin }: { children: React.ReactNode; skin: Theme
       className="flex min-h-screen items-center justify-center bg-[var(--skin-bg)] px-4 py-10 text-[var(--skin-ink)]"
     >
       <div className="w-full max-w-sm">
-        <p className="mb-4 text-center text-xs font-semibold tracking-wide text-[var(--skin-accent)]">
-          JOGAJOG EMERGENCY
-        </p>
+        <div className="mb-4 text-center">
+          <p className="text-xs font-semibold tracking-wide text-[var(--skin-accent)]">
+            JOGAJOG EMERGENCY
+          </p>
+          {skin.tagline && (
+            <p className="mt-1 text-[11px] text-[var(--skin-muted)]">{skin.tagline}</p>
+          )}
+        </div>
         <div className="rounded-2xl border border-[var(--skin-line)] bg-[var(--skin-surface)] p-6 shadow-sm">
           {children}
         </div>

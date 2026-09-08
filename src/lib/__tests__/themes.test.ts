@@ -11,6 +11,7 @@ import {
 const freeTheme: ThemeSkin = {
   slug: "sunrise",
   name: "Sunrise",
+  tagline: "Warm and cheerful, for everyday things.",
   bgColor: "#FFF7ED",
   surfaceColor: "#FFFFFF",
   inkColor: "#1F2937",
@@ -133,5 +134,19 @@ describe("themeCssVars — text sitting on the accent colour", () => {
     const vars = themeCssVars(paleOnDark);
     expect(vars["--skin-accent"]).toBe("#FFE066");
     expect(vars["--skin-on-accent"]).toBe("#111111");
+  });
+});
+
+describe("DEFAULT_THEME", () => {
+  // The house skin is what a customer who bought no themed sticker gets, so
+  // it has to be branded and readable on its own merits.
+  it("is the Jogajog Emergency skin, and carries its slogan", () => {
+    expect(DEFAULT_THEME.slug).toBe("jogajog-emergency");
+    expect(DEFAULT_THEME.name).toBe("Jogajog Emergency");
+    expect(DEFAULT_THEME.tagline).toContain("emergency");
+  });
+
+  it("passes normal-text contrast without the readability fallback kicking in", () => {
+    expect(contrastRatio(DEFAULT_THEME.inkColor, DEFAULT_THEME.surfaceColor)).toBeGreaterThanOrEqual(4.5);
   });
 });

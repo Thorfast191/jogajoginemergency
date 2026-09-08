@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { themeSchema } from "@/lib/validations";
+import { DEFAULT_THEME_SLUG } from "@/lib/theme-access";
 import { processImage, MediaError } from "@/lib/media";
 
 export type ThemeState = { error?: string; success?: boolean };
@@ -71,9 +72,17 @@ export async function updateThemeAction(
  * Archiving hides a theme from the store and the picker. Tags already using it
  * keep their themeId and keep rendering — pulling a skin out from under an
  * existing sticker would change what a stranger sees with no warning.
+ *
+ * The default theme is exempt: it is what every account falls back to and what
+ * a customer who bought no themed sticker gets, so archiving it would leave
+ * those scan pages with no skin at all.
  */
 export async function archiveThemeAction(id: string): Promise<void> {
   await requireAdmin();
+
+  const theme = await prisma.theme.findUnique({ where: { id }, select: { slug: true } });
+  if (!theme || theme.slug === DEFAULT_THEME_SLUG) return;
+
   await prisma.theme.update({ where: { id }, data: { status: "ARCHIVED" } });
   revalidate();
 }

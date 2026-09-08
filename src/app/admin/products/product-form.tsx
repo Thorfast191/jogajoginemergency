@@ -14,6 +14,7 @@ type Product = {
   useCase: string | null;
   priceCents: number;
   currency: string;
+  qrSlots: number;
   status: string;
   sortOrder: number;
   themeId: string | null;
@@ -63,7 +64,7 @@ export function ProductForm({
         Use case
         <input name="useCase" defaultValue={product?.useCase ?? ""} className={field} />
       </label>
-      <div className="grid sm:grid-cols-3 gap-3">
+      <div className="grid sm:grid-cols-4 gap-3">
         <label className="text-sm">
           Price (cents)
           <input
@@ -80,6 +81,18 @@ export function ProductForm({
           <input name="currency" defaultValue={product?.currency ?? "BDT"} className={field} />
         </label>
         <label className="text-sm">
+          QR slots
+          <input
+            name="qrSlots"
+            type="number"
+            min={1}
+            max={100}
+            defaultValue={product?.qrSlots ?? 1}
+            required
+            className={field}
+          />
+        </label>
+        <label className="text-sm">
           Sort order
           <input
             name="sortOrder"
@@ -90,28 +103,48 @@ export function ProductForm({
           />
         </label>
       </div>
+      <p className="-mt-1 text-xs text-black/40">
+        QR slots is how many QR codes one purchase lets the customer generate.
+      </p>
+      <label className="text-sm block">
+        Theme
+        <select name="themeId" defaultValue={product?.themeId ?? ""} className={field}>
+          <option value="">No theme</option>
+          {themes.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}
+            </option>
+          ))}
+        </select>
+        <span className="mt-1 block text-xs text-black/40">
+          Sets the printed artwork and the starting scan-page skin for tags sold as this product.
+          Buying this product is what unlocks the theme for the customer.
+        </span>
+      </label>
+
       <label className="text-sm block">
         Status
-        <label className="text-sm block">
-          Theme
-          <select name="themeId" defaultValue={product?.themeId ?? ""} className={field}>
-            <option value="">No theme</option>
-            {themes.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-          <span className="mt-1 block text-xs text-black/40">
-            Sets the printed artwork and the starting scan-page skin for tags sold as this product.
-          </span>
-        </label>
         <select name="status" defaultValue={product?.status ?? "DRAFT"} className={field}>
           <option value="DRAFT">Draft</option>
           <option value="ACTIVE">Active</option>
           <option value="ARCHIVED">Archived</option>
         </select>
       </label>
+
+      {!product && (
+        <label className="text-sm block">
+          Product image
+          <input
+            type="file"
+            name="image"
+            accept="image/jpeg,image/png,image/webp"
+            className="mt-1 block w-full text-xs"
+          />
+          <span className="mt-1 block text-xs text-black/40">
+            Optional. You can also add or replace it after saving.
+          </span>
+        </label>
+      )}
 
       {state.error && <p className="text-sm text-red-600">{state.error}</p>}
       {state.success && <p className="text-sm text-emerald-600">Saved.</p>}

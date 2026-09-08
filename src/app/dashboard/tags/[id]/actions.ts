@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { requireCustomer } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { tagCustomerUpdateSchema } from "@/lib/validations";
+import { entitledThemeIdsForUser } from "@/lib/theme-access-server";
+import { canUseTheme } from "@/lib/theme-access";
 
 export type TagUpdateState = { error?: string; success?: boolean };
 
@@ -46,8 +48,12 @@ export async function updateTagAction(
 }
 
 /**
- * Re-skin a tag's scan page. Ownership is the only gate — themes are cosmetic,
- * and a subscription already pays for the page they appear on.
+ * Re-skin a tag's scan page.
+ *
+ * Two gates: the tag must belong to the caller, and the theme must be one they
+ * paid for. A theme rides on the sticker product that carries it, so this is
+ * what makes a themed sticker worth buying — the picker hides what you do not
+ * own, and this refuses it if the form is posted by hand anyway.
  */
 export async function setTagThemeAction(formData: FormData): Promise<void> {
   const user = await requireCustomer();
@@ -65,6 +71,9 @@ export async function setTagThemeAction(formData: FormData): Promise<void> {
       select: { id: true },
     });
     if (!theme) return;
+
+    const entitled = await entitledThemeIdsForUser(user.id);
+    if (!canUseTheme(themeId, entitled)) return;
   }
 
   await prisma.tag.update({ where: { id: tag.id }, data: { themeId } });

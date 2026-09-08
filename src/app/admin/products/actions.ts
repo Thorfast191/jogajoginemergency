@@ -18,6 +18,7 @@ function parse(formData: FormData) {
     useCase: formData.get("useCase") || null,
     priceCents: formData.get("priceCents"),
     currency: formData.get("currency") || "BDT",
+    qrSlots: formData.get("qrSlots") || 1,
     themeId: formData.get("themeId") || null,
     status: formData.get("status"),
     sortOrder: formData.get("sortOrder") || 0,
@@ -40,9 +41,50 @@ export async function createProductAction(
   const clash = await prisma.product.findUnique({ where: { slug: parsed.data.slug } });
   if (clash) return { error: "A product with that slug already exists." };
 
-  const created = await prisma.product.create({ data: parsed.data });
+  // An image may come with the very first save, so a new product need not be
+  // created blank and then edited just to give it a picture.
+  const file = formData.get("image");
+  let imageAssetId: string | null = null;
+  if (file instanceof File && file.size > 0) {
+    const asset = await storeProductImage(file);
+    if ("error" in asset) return asset;
+    imageAssetId = asset.id;
+  }
+
+  const created = await prisma.product.create({ data: { ...parsed.data, imageAssetId } });
   revalidate();
   redirect(`/admin/products/${created.id}`);
+}
+
+/**
+ * Validate, re-encode and store one uploaded product image.
+ *
+ * Shared by create and replace so both enforce the same size ceiling and the
+ * same re-encoding — an uploaded file is never stored as it arrived.
+ */
+async function storeProductImage(file: File): Promise<{ id: string } | { error: string }> {
+  if (file.size > 5 * 1024 * 1024) return { error: "Image is larger than 5 MB." };
+
+  let processed;
+  try {
+    processed = await processImage(Buffer.from(await file.arrayBuffer()), "PRODUCT_IMAGE");
+  } catch (e) {
+    return { error: e instanceof MediaError ? e.message : "Could not process that image." };
+  }
+
+  const asset = await prisma.mediaAsset.create({
+    data: {
+      ownerId: null,
+      kind: "PRODUCT_IMAGE",
+      mimeType: processed.mimeType,
+      byteSize: processed.byteSize,
+      width: processed.width,
+      height: processed.height,
+      data: new Uint8Array(processed.data),
+      checksum: processed.checksum,
+    },
+  });
+  return { id: asset.id };
 }
 
 export async function updateProductAction(
@@ -82,30 +124,12 @@ export async function uploadProductImageAction(
 
   const file = formData.get("image");
   if (!(file instanceof File) || file.size === 0) return { error: "Choose an image." };
-  if (file.size > 5 * 1024 * 1024) return { error: "Image is larger than 5 MB." };
 
   const product = await prisma.product.findUnique({ where: { id }, select: { imageAssetId: true } });
   if (!product) return { error: "Product not found." };
 
-  let processed;
-  try {
-    processed = await processImage(Buffer.from(await file.arrayBuffer()), "PRODUCT_IMAGE");
-  } catch (e) {
-    return { error: e instanceof MediaError ? e.message : "Could not process that image." };
-  }
-
-  const asset = await prisma.mediaAsset.create({
-    data: {
-      ownerId: null,
-      kind: "PRODUCT_IMAGE",
-      mimeType: processed.mimeType,
-      byteSize: processed.byteSize,
-      width: processed.width,
-      height: processed.height,
-      data: new Uint8Array(processed.data),
-      checksum: processed.checksum,
-    },
-  });
+  const asset = await storeProductImage(file);
+  if ("error" in asset) return asset;
 
   await prisma.product.update({ where: { id }, data: { imageAssetId: asset.id } });
   if (product.imageAssetId) {

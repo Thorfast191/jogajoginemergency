@@ -5,8 +5,9 @@ import { redirect } from "next/navigation";
 import { requireCustomer } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { createTag } from "@/lib/tag";
-import { slotBalanceForUser } from "@/lib/slots-server";
-import { canGenerateTag } from "@/lib/slots";
+import { slotBalanceForUser, paidLineCapacities } from "@/lib/slots-server";
+import { canGenerateTag, nextOpenLine } from "@/lib/slots";
+import { defaultTheme } from "@/lib/theme-access-server";
 
 export type GenerateState = { error?: string };
 
@@ -41,13 +42,15 @@ export async function generateTagAction(
   const labelRaw = formData.get("internalLabel");
   const label = typeof labelRaw === "string" ? labelRaw.trim().slice(0, 100) : "";
 
-  // Pick the most recent paid line that still has an unused slot, so the new
-  // tag inherits the right product and its theme.
-  const line = await prisma.orderItem.findFirst({
-    where: { order: { userId: user.id, status: "PAID" } },
-    orderBy: { order: { placedAt: "desc" } },
-    select: { id: true, productId: true, product: { select: { themeId: true } } },
-  });
+  // Charge the tag to the oldest paid line that still has an unused slot, so
+  // it inherits that purchase's product, theme and provenance. Reading the
+  // most recent line instead would hand a second Classic tag the theme of a
+  // Night Guardian sticker whose slot was never spent.
+  const line = nextOpenLine(await paidLineCapacities(user.id));
+
+  // A sticker sold without a theme still gets the branded default rather than
+  // an unstyled page.
+  const fallbackTheme = line?.themeId ? null : await defaultTheme();
 
   let tagId = "";
   try {
@@ -58,8 +61,8 @@ export async function generateTagAction(
       const tag = await createTag(tx, {
         userId: user.id,
         productId: line?.productId ?? null,
-        orderItemId: line?.id ?? null,
-        themeId: line?.product.themeId ?? null,
+        orderItemId: line?.orderItemId ?? null,
+        themeId: line?.themeId ?? fallbackTheme?.id ?? null,
       });
       if (label) {
         await tx.tag.update({ where: { id: tag.id }, data: { internalLabel: label } });

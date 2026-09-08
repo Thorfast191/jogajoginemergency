@@ -156,6 +156,10 @@ export const productSchema = z.object({
   useCase: z.string().max(500).optional().nullable(),
   priceCents: z.coerce.number().int().min(0),
   currency: z.string().min(1).max(8).default("BDT"),
+  // How many QR codes one of these entitles the buyer to generate. Capped
+  // because it is the only thing standing between a purchase and unlimited
+  // tags, and a typo here is a hole rather than a cosmetic mistake.
+  qrSlots: z.coerce.number().int().min(1).max(100),
   themeId: z.string().optional().nullable(),
   status: z.enum(["DRAFT", "ACTIVE", "ARCHIVED"]),
   sortOrder: z.coerce.number().int().min(0).max(9999),

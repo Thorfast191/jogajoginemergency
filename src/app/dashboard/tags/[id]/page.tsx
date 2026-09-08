@@ -7,13 +7,14 @@ import { summarizeUserAgent } from "@/lib/user-agent";
 import { TagSettingsForm } from "./tag-settings-form";
 import { ThemePicker } from "./theme-picker";
 import type { ThemeSkin } from "@/lib/themes";
+import { entitledThemeIdsForUser } from "@/lib/theme-access-server";
 
 export default async function TagDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const user = await getCustomer();
   if (!user) redirect("/login");
 
-  const [tag, scans, messages, themes] = await Promise.all([
+  const [tag, scans, messages, themes, entitledThemeIds, products] = await Promise.all([
     prisma.tag.findFirst({
       where: { id, userId: user.id },
       include: { product: true, orderItem: { select: { orderId: true } } },
@@ -31,6 +32,13 @@ export default async function TagDetailPage({ params }: { params: Promise<{ id: 
     prisma.theme.findMany({
       where: { status: "ACTIVE" },
       orderBy: { sortOrder: "asc" },
+    }),
+    entitledThemeIdsForUser(user.id),
+    // What a locked theme could be bought through, so the picker can point at
+    // the sticker instead of just refusing.
+    prisma.product.findMany({
+      where: { status: "ACTIVE", themeId: { not: null } },
+      select: { slug: true, name: true, themeId: true, priceCents: true },
     }),
   ]);
 
@@ -136,6 +144,8 @@ export default async function TagDetailPage({ params }: { params: Promise<{ id: 
               tagId={tag.id}
               themes={themes as (ThemeSkin & { id: string })[]}
               currentThemeId={tag.themeId}
+              entitledThemeIds={[...entitledThemeIds]}
+              products={products}
             />
           </div>
           <p className="mt-4 text-xs text-black/50">

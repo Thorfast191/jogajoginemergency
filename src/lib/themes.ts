@@ -7,6 +7,8 @@
 export type ThemeSkin = {
   slug: string;
   name: string;
+  /** The line shown under the wordmark on a scan page. */
+  tagline: string;
   bgColor: string;
   surfaceColor: string;
   inkColor: string;
@@ -18,9 +20,19 @@ export type ThemeSkin = {
 export const MASCOTS = ["BLOB", "GUARDIAN", "WEBBED", "SPARK", "ROVER"] as const;
 export type MascotKey = (typeof MASCOTS)[number];
 
+/**
+ * The house skin, and the one every account gets without buying anything.
+ *
+ * This mirrors the seeded `jogajog-emergency` theme row (see
+ * DEFAULT_THEME_SLUG in src/lib/theme-access.ts). It exists as a constant too
+ * so a scan page still renders correctly on a database that has not been
+ * seeded, or if the row is ever removed — the one page that must never break
+ * is the one a stranger opens in an emergency.
+ */
 export const DEFAULT_THEME: ThemeSkin = {
-  slug: "classic",
-  name: "Classic",
+  slug: "jogajog-emergency",
+  name: "Jogajog Emergency",
+  tagline: "🚨 Please scan this QR if it's an emergency",
   bgColor: "#FBF9F6",
   surfaceColor: "#FFFFFF",
   inkColor: "#171717",

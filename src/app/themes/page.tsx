@@ -24,7 +24,8 @@ export default async function ThemesPage() {
           <h1 className="text-3xl font-bold sm:text-4xl">Pick a look</h1>
           <p className="mx-auto mt-3 max-w-xl text-black/60">
             A theme sets both the artwork printed on your sticker and the page a finder sees when
-            they scan it. Free themes are yours forever; premium skins come with Plus.
+            they scan it. Each theme comes with the sticker that carries it — and every account
+            starts with the Jogajog Emergency skin, free forever.
           </p>
         </div>
 

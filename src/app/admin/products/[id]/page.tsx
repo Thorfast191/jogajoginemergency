@@ -49,6 +49,7 @@ export default async function AdminProductDetailPage({
               useCase: product.useCase,
               priceCents: product.priceCents,
               currency: product.currency,
+              qrSlots: product.qrSlots,
               status: product.status,
               sortOrder: product.sortOrder,
               themeId: product.themeId,

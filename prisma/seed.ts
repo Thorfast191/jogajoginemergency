@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { randomBytes } from "node:crypto";
 import { renderSvgToWebp } from "../src/lib/media";
 
 const prisma = new PrismaClient();
@@ -23,6 +24,21 @@ function placeholderSvg(label: string, accent: string): string {
 // web-slinger, a speedster — without copying any licensed character's
 // likeness, name or costume. If real characters are ever licensed, add rows.
 const THEMES = [
+  // The house skin. Every account has this one without buying anything, so it
+  // is what a scan page falls back to — see DEFAULT_THEME_SLUG in
+  // src/lib/theme-access.ts and DEFAULT_THEME in src/lib/themes.ts, which
+  // mirror it. No product carries it; it is not for sale.
+  {
+    slug: "jogajog-emergency",
+    name: "Jogajog Emergency",
+    tagline: "🚨 Please scan this QR if it's an emergency",
+    bgColor: "#FBF9F6",
+    surfaceColor: "#FFFFFF",
+    inkColor: "#171717",
+    accentColor: "#059669",
+    mascot: "BLOB",
+    sortOrder: 0,
+  },
   {
     slug: "classic",
     name: "Classic",
@@ -183,18 +199,30 @@ async function main() {
   }
   console.log(`Seeded ${THEMES.length} themes.`);
 
-  const adminEmail = "admin@jogajog.app";
+  // The first admin. The password is taken from the environment, and otherwise
+  // generated — a seed that ships a known password puts the same credentials on
+  // every deployment that ever runs it, and the one account that can suspend
+  // users and edit the store is the worst place for that.
+  const adminEmail = process.env.SEED_ADMIN_EMAIL?.trim() || "admin@jogajog.app";
   const existingAdmin = await prisma.user.findUnique({ where: { email: adminEmail } });
   if (!existingAdmin) {
+    const supplied = process.env.SEED_ADMIN_PASSWORD?.trim();
+    const password = supplied || randomBytes(12).toString("base64url");
     await prisma.user.create({
       data: {
         name: "Jogajog Admin",
         email: adminEmail,
-        passwordHash: await bcrypt.hash("ChangeMe123!", 10),
+        passwordHash: await bcrypt.hash(password, 10),
         role: "ADMIN",
       },
     });
-    console.log(`Created admin user: ${adminEmail} / ChangeMe123! (change this immediately)`);
+    console.log(`Created admin user: ${adminEmail}`);
+    if (supplied) {
+      console.log("Password: the SEED_ADMIN_PASSWORD you supplied.");
+    } else {
+      console.log(`Password: ${password}`);
+      console.log("This is shown once. Change it at /admin/profile after signing in.");
+    }
   }
 
   for (const p of PRODUCTS) {

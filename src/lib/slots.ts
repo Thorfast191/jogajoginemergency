@@ -31,3 +31,44 @@ export function slotBalance(lines: PaidLine[], tagsCreated: number): SlotBalance
 export function canGenerateTag(balance: SlotBalance): boolean {
   return balance.available > 0;
 }
+
+// --- Per-line attribution -------------------------------------------------
+// The totals above answer "may this account generate a tag at all". They do
+// not say which purchase the new tag belongs to, and that matters: a tag
+// inherits its line's product and theme, and the line is its provenance.
+// Picking the most recent paid line regardless of whether its slots are
+// already spent gets both wrong once a customer has bought twice.
+
+export type LineCapacity = {
+  orderItemId: string;
+  productId: string | null;
+  themeId: string | null;
+  quantity: number;
+  qrSlots: number;
+  /** Tags already generated against this line. */
+  tagsUsed: number;
+};
+
+function whole(value: number): number {
+  return Number.isFinite(value) ? Math.max(0, Math.trunc(value)) : 0;
+}
+
+/** Slots still unspent on one order line. */
+export function lineRemaining(line: LineCapacity): number {
+  return Math.max(0, whole(line.quantity) * whole(line.qrSlots) - whole(line.tagsUsed));
+}
+
+/**
+ * The line a newly generated tag should be charged to.
+ *
+ * Callers pass lines oldest purchase first, so the oldest unspent slot is
+ * used up before a newer one — a customer who bought a plain sticker last year
+ * and a themed one today gets the plain one's slot first, and the themed
+ * sticker's slot stays available for the tag they actually want themed.
+ */
+export function nextOpenLine(lines: readonly LineCapacity[]): LineCapacity | null {
+  for (const line of lines) {
+    if (lineRemaining(line) > 0) return line;
+  }
+  return null;
+}
