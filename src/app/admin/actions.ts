@@ -3,8 +3,15 @@
 import { revalidatePath } from "next/cache";
 import { getAdmin, requireAdmin } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
+import { z } from "zod";
+import { canSetUserStatus, type Role } from "@/lib/admin-guards";
 
 export type AdminActionState = { error?: string; ok?: boolean };
+
+const customerIdentitySchema = z.object({
+  name: z.string().min(2).max(100),
+  email: z.email("Enter a valid email address."),
+});
 
 function revalidateTagViews() {
   revalidatePath("/admin/tags");
@@ -14,7 +21,7 @@ function revalidateTagViews() {
 // --- Users --------------------------------------------------------------
 
 export async function setUserStatusAction(userId: string, status: "ACTIVE" | "SUSPENDED") {
-  await requireAdmin();
+  const actor = await requireAdmin();
 
   const target = await prisma.user.findUnique({
     where: { id: userId },
@@ -22,15 +29,62 @@ export async function setUserStatusAction(userId: string, status: "ACTIVE" | "SU
   });
   if (!target) throw new Error("User not found.");
 
-  // Admin accounts are not customer accounts and must not be suspended or
-  // toggled from this screen. Managing admins is a deliberate, separate
-  // operation (currently seed/DB only).
-  if (target.role === "ADMIN") {
-    throw new Error("Admin accounts cannot be modified here.");
-  }
+  // Suspending an admin is a demotion in disguise, and suspending yourself
+  // locks you out of the console. Both go through /admin/admins instead.
+  const guard = canSetUserStatus({
+    actorId: actor.id,
+    targetId: target.id,
+    targetRole: target.role as Role,
+  });
+  if (!guard.ok) throw new Error(guard.reason);
 
   await prisma.user.update({ where: { id: target.id }, data: { status } });
   revalidatePath("/admin/users");
+  revalidatePath(`/admin/users/${target.id}`);
+}
+
+/**
+ * Correct a customer's name or sign-in email on their behalf.
+ *
+ * A support desk needs this — people mistype their own email at signup and
+ * then cannot receive a reset link. Restricted to customers: an admin's own
+ * details are changed at /admin/profile, and another admin's are theirs alone.
+ */
+export async function updateCustomerIdentityAction(
+  userId: string,
+  _prev: AdminActionState,
+  formData: FormData,
+): Promise<AdminActionState> {
+  await requireAdmin();
+
+  const parsed = customerIdentitySchema.safeParse({
+    name: formData.get("name"),
+    email: formData.get("email"),
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+
+  const target = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, role: true },
+  });
+  if (!target) return { error: "User not found." };
+  if (target.role === "ADMIN") return { error: "Admin accounts are edited at /admin/profile." };
+
+  const email = parsed.data.email.trim().toLowerCase();
+  const clash = await prisma.user.findFirst({
+    where: { email, NOT: { id: target.id } },
+    select: { id: true },
+  });
+  if (clash) return { error: "Another account already uses that email." };
+
+  await prisma.user.update({
+    where: { id: target.id },
+    data: { name: parsed.data.name.trim(), email },
+  });
+
+  revalidatePath("/admin/users");
+  revalidatePath(`/admin/users/${target.id}`);
+  return { ok: true };
 }
 
 // --- Tags ---------------------------------------------------------------

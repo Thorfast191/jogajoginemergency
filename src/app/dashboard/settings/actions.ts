@@ -1,10 +1,10 @@
 "use server";
 
-import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { getCustomer, requireCustomer } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
+import { changeOwnPassword } from "@/lib/account";
 
 const profileSchema = z.object({
   name: z.string().min(2).max(100),
@@ -55,14 +55,14 @@ export async function updatePasswordAction(
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
 
-  const user = await prisma.user.findUnique({ where: { id: authedUser.id } });
-  if (!user) return { error: "User not found." };
-
-  const valid = await bcrypt.compare(parsed.data.currentPassword, user.passwordHash);
-  if (!valid) return { error: "Current password is incorrect." };
-
-  const passwordHash = await bcrypt.hash(parsed.data.newPassword, 10);
-  await prisma.user.update({ where: { id: user.id }, data: { passwordHash } });
+  // Shared with the admin profile page. Stamps passwordChangedAt, so changing
+  // your password signs out every other device rather than only this one.
+  const result = await changeOwnPassword(
+    authedUser.id,
+    parsed.data.currentPassword,
+    parsed.data.newPassword,
+  );
+  if (!result.ok) return { error: result.error };
 
   return { success: true };
 }

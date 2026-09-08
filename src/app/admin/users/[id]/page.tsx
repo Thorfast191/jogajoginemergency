@@ -4,6 +4,7 @@ import { getAdmin } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/money";
 import { UserStatusToggle } from "../status-toggle";
+import { CustomerIdentityForm } from "./identity-form";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +36,22 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
         <div className="mt-2">
           <UserStatusToggle userId={user.id} status={user.status} />
         </div>
+      )}
+
+      {user.role === "USER" ? (
+        <section className="mt-6">
+          <h2 className="text-xs font-medium uppercase tracking-wide text-black/40">
+            Account details
+          </h2>
+          <div className="mt-3">
+            <CustomerIdentityForm userId={user.id} name={user.name} email={user.email} />
+          </div>
+        </section>
+      ) : (
+        <p className="mt-4 text-sm text-black/50">
+          This is an admin account. Its own details are changed at /admin/profile, and its admin
+          access at /admin/admins.
+        </p>
       )}
 
       <div className="mt-6 grid sm:grid-cols-3 gap-4 text-sm">
