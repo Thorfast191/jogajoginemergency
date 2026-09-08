@@ -55,8 +55,10 @@ SSLCommerz. Tests: Vitest (`npm test`) — security-critical pure logic only.
    up with the wired-in credentials.
 2. `npm install`
 3. `npx prisma migrate deploy`
-4. `npm run db:seed` — six themes, the subscription plan, an admin (`admin@jogajog.app` /
-   `ChangeMe123!` — **change this immediately**), and four `ACTIVE` sticker products.
+4. `npm run db:seed` — seven themes (including the `jogajog-emergency` default every
+   account gets for free), the subscription plan, four `ACTIVE` sticker products, and the
+   first admin. The seed prints a generated password once unless you set
+   `SEED_ADMIN_PASSWORD`; change it afterwards at `/admin/profile`.
 5. `npm run dev`
 
 ## Environment

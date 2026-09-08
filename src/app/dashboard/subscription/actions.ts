@@ -6,6 +6,7 @@ import { requireCustomer } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { gatewayFor } from "@/lib/payments/registry";
 import { appUrl } from "@/lib/payments/config";
+import { warnOnOriginMismatch } from "@/lib/app-origin";
 import { GatewayError } from "@/lib/payments/types";
 
 /**
@@ -74,6 +75,7 @@ export async function subscribeAction(formData: FormData): Promise<void> {
 
   let redirectUrl: string;
   try {
+    await warnOnOriginMismatch("subscription");
     const result = await gateway.initiate({
       paymentId: payment.id,
       amountCents: plan.priceCents,

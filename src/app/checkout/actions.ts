@@ -9,6 +9,7 @@ import { generateOrderNumber } from "@/lib/order";
 import { readCart, resolveCart } from "@/lib/cart-server";
 import { gatewayFor } from "@/lib/payments/registry";
 import { appUrl } from "@/lib/payments/config";
+import { warnOnOriginMismatch } from "@/lib/app-origin";
 import { GatewayError } from "@/lib/payments/types";
 
 export type CheckoutState = { error?: string };
@@ -128,6 +129,7 @@ export async function createOrderAction(
 
   let redirectUrl: string;
   try {
+    await warnOnOriginMismatch("checkout");
     const result = await gateway.initiate({
       paymentId,
       amountCents: cart.totalCents,
