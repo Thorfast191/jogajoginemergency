@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import { after } from "next/server";
@@ -10,9 +9,10 @@ import { rateLimit } from "@/lib/rate-limit";
 import { approxLocationFrom, formatLocation } from "@/lib/geo";
 import { notifyOwnerOfScan } from "@/lib/notify";
 import { buildPublicProfileView } from "@/lib/public-profile";
-import { resolveScanTheme, themeCssVars, type ThemeSkin } from "@/lib/themes";
+import { resolveScanTheme, type ThemeSkin } from "@/lib/themes";
 import { userIsEntitled } from "@/lib/subscription";
 import { PublicProfileCard } from "@/components/public-profile-card";
+import { ScanLayout } from "@/components/scan-layout";
 import { ThemeMascot } from "@/components/illustrations";
 import { ReportAbuseLink } from "./report-abuse-link";
 
@@ -162,30 +162,3 @@ const EMPTY_PROFILE = {
   linksPublic: false,
 };
 
-function ScanLayout({ children, skin }: { children: React.ReactNode; skin: ThemeSkin }) {
-  return (
-    <div
-      style={themeCssVars(skin) as React.CSSProperties}
-      className="flex min-h-screen items-center justify-center bg-[var(--skin-bg)] px-4 py-10 text-[var(--skin-ink)]"
-    >
-      <div className="w-full max-w-sm">
-        <div className="mb-4 text-center">
-          <p className="text-xs font-semibold tracking-wide text-[var(--skin-accent)]">
-            JOGAJOG EMERGENCY
-          </p>
-          {skin.tagline && (
-            <p className="mt-1 text-[11px] text-[var(--skin-muted)]">{skin.tagline}</p>
-          )}
-        </div>
-        <div className="rounded-2xl border border-[var(--skin-line)] bg-[var(--skin-surface)] p-6 shadow-sm">
-          {children}
-        </div>
-        <p className="mt-4 text-center text-[11px] text-[var(--skin-muted)]">
-          <Link href="/" className="hover:underline">
-            What is Jogajog Emergency?
-          </Link>
-        </p>
-      </div>
-    </div>
-  );
-}

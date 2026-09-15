@@ -109,4 +109,53 @@ body {
   .hover-lift { transition: transform 0.18s ease, box-shadow 0.18s ease; }
   .hover-lift:hover { transform: translateY(-3px); box-shadow: var(--shadow-soft); }
   .hover-wiggle:hover { animation: wiggle 0.4s ease-in-out; }
+
+  /*
+   * Scroll reveal. <Reveal> adds .is-visible once an element scrolls into
+   * view. The hidden starting state exists only inside this media query, so
+   * anyone who prefers reduced motion simply sees the content.
+   */
+  .reveal {
+    opacity: 0;
+    transform: translateY(18px);
+    transition:
+      opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+      transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .reveal.is-visible { opacity: 1; transform: none; }
+
+  /* A laser sweeping across a QR code in the hero phone. */
+  @keyframes scan-line {
+    0%, 100% { top: 10%; }
+    50% { top: 86%; }
+  }
+  .anim-scan-line { animation: scan-line 3.2s ease-in-out infinite; }
+
+  /* A soft radar ping behind "someone just scanned" indicators. */
+  @keyframes ping-soft {
+    0% { transform: scale(1); opacity: 0.55; }
+    100% { transform: scale(2.2); opacity: 0; }
+  }
+  .anim-ping { animation: ping-soft 2.2s cubic-bezier(0, 0, 0.2, 1) infinite; }
+
+  /* Content swapping in place, e.g. the demo phone changing theme. */
+  @keyframes swap-in {
+    from { opacity: 0; transform: translateY(8px) scale(0.99); }
+    to { opacity: 1; transform: none; }
+  }
+  .anim-swap { animation: swap-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+  /* An endless strip of use cases. The track holds its items twice. */
+  @keyframes marquee {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+  .anim-marquee { animation: marquee 38s linear infinite; }
+  .anim-marquee:hover { animation-play-state: paused; }
+}
+
+/* A faint dotted grid for hero backgrounds. */
+.bg-dots {
+  background-image: radial-gradient(rgb(28 25 23 / 0.07) 1px, transparent 1px);
+  background-size: 22px 22px;
 }

@@ -10,15 +10,32 @@ import { ThemeMascot } from "@/components/illustrations";
 // forced to meet WCAG contrast against the card's own surface. Someone may be
 // reading this on a stranger's phone to find a blood group: legibility is not
 // negotiable, whatever the skin says.
+/** What the demo shows where a real page has its message form. */
+function DemoRelay() {
+  return (
+    <div className="rounded-xl border border-dashed border-[var(--skin-line)] p-4 text-center text-sm">
+      <p className="font-semibold">Message the owner</p>
+      <p className="mt-1 text-[var(--skin-muted)]">
+        On a real sticker, a finder types a message here. It reaches the owner by email — their
+        number is never shown.
+      </p>
+    </div>
+  );
+}
+
 export function PublicProfileCard({
   view,
   shortCode,
   mascot,
+  demo = false,
 }: {
   view: PublicProfileView;
   shortCode: string;
   mascot?: string;
+  /** Sample data: no working relay, no dialable numbers. */
+  demo?: boolean;
 }) {
+  const relay = demo ? <DemoRelay /> : <RelayForm shortCode={shortCode} />;
   const medical: Array<[string, string | null]> = [
     ["Blood group", view.bloodGroup],
     ["Allergies", view.allergies],
@@ -44,11 +61,7 @@ export function PublicProfileCard({
               : "This tag isn't active right now."}
           </p>
         </div>
-        {view.relayOpen && (
-          <div className="mt-6">
-            <RelayForm shortCode={shortCode} />
-          </div>
-        )}
+        {view.relayOpen && <div className="mt-6">{relay}</div>}
       </div>
     );
   }
@@ -106,7 +119,7 @@ export function PublicProfileCard({
             Call to return this
           </a>
         ) : (
-          <RelayForm shortCode={shortCode} />
+          relay
         )}
       </div>
 
@@ -123,11 +136,14 @@ export function PublicProfileCard({
                   {c.relation ? <span className="font-normal text-[var(--skin-muted)]"> · {c.relation}</span> : null}
                 </p>
                 <div className="mt-1 flex gap-3 text-xs">
-                  {c.phone && (
-                    <a href={`tel:${c.phone}`} className="text-[var(--skin-accent)] hover:underline">
-                      Call {c.phone}
-                    </a>
-                  )}
+                  {c.phone &&
+                    (demo ? (
+                      <span className="text-[var(--skin-accent)]">Call {c.phone}</span>
+                    ) : (
+                      <a href={`tel:${c.phone}`} className="text-[var(--skin-accent)] hover:underline">
+                        Call {c.phone}
+                      </a>
+                    ))}
                   {c.email && (
                     <a href={`mailto:${c.email}`} className="text-[var(--skin-accent)] hover:underline">
                       Email

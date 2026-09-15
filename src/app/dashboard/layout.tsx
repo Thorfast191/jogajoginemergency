@@ -2,25 +2,33 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireActiveUser } from "@/lib/session";
 import { signOutAction } from "@/app/auth-actions";
+import { SideNav, type SideNavSection } from "@/components/side-nav";
+import { Icon } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
 
-const links = [
-  { href: "/dashboard", label: "Overview" },
-  { href: "/dashboard/profile", label: "My Profile" },
-  { href: "/dashboard/privacy", label: "Privacy" },
-  { href: "/dashboard/tags", label: "My Tags" },
-  { href: "/dashboard/orders", label: "Orders" },
-  { href: "/dashboard/messages", label: "Messages" },
-  { href: "/dashboard/settings", label: "Settings" },
-  { href: "/dashboard/subscription", label: "Subscription" },
+const SECTIONS: SideNavSection[] = [
+  { links: [{ href: "/dashboard", label: "Overview", icon: "home" }] },
+  {
+    heading: "My page",
+    links: [
+      { href: "/dashboard/tags", label: "My QR codes", icon: "qr" },
+      { href: "/dashboard/profile", label: "Emergency profile", icon: "user" },
+      { href: "/dashboard/privacy", label: "Privacy", icon: "lock" },
+      { href: "/dashboard/messages", label: "Messages", icon: "message" },
+    ],
+  },
+  {
+    heading: "Account",
+    links: [
+      { href: "/dashboard/subscription", label: "Plan", icon: "card" },
+      { href: "/dashboard/orders", label: "Orders", icon: "receipt" },
+      { href: "/dashboard/settings", label: "Settings", icon: "settings" },
+    ],
+  },
 ];
 
-export default async function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const user = await requireActiveUser();
   if (!user) redirect("/login");
 
@@ -29,34 +37,40 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen flex flex-col sm:flex-row">
-      <aside className="sm:w-56 border-b sm:border-b-0 sm:border-r border-black/10 p-4 flex sm:flex-col gap-1">
-        <Link href="/" className="font-semibold mb-4 hidden sm:block">
-          Jogajog <span className="text-emerald-600">Emergency</span>
-        </Link>
-        <nav className="flex sm:flex-col gap-1 flex-wrap">
-          {links.map((l) => (
+    <div className="flex min-h-screen flex-col bg-[#f7f6f3] md:flex-row">
+      <SideNav
+        rootHref="/dashboard"
+        sections={SECTIONS}
+        brand={
+          <Link href="/" className="font-bold tracking-tight">
+            Jogajog <span className="text-[var(--color-primary)]">Emergency</span>
+          </Link>
+        }
+        footer={
+          <div className="flex flex-col gap-0.5">
             <Link
-              key={l.href}
-              href={l.href}
-              className="rounded-md px-3 py-2 text-sm hover:bg-black/5"
+              href="/shop"
+              className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-black/70 hover:bg-black/[0.04]"
             >
-              {l.label}
+              <Icon name="cart" className="text-black/40" />
+              Buy a sticker
             </Link>
-          ))}
-        </nav>
-        <div className="sm:mt-auto flex flex-col gap-2">
-          <form action={signOutAction}>
-            <button
-              type="submit"
-              className="text-sm px-3 py-2 rounded-md hover:bg-black/5 text-left w-full"
-            >
-              Log out
-            </button>
-          </form>
-        </div>
-      </aside>
-      <main className="flex-1 p-6 max-w-4xl">{children}</main>
+            <p className="truncate px-3 pt-1 text-xs text-black/40">{user.email}</p>
+            <form action={signOutAction}>
+              <button
+                type="submit"
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-black/70 hover:bg-black/[0.04]"
+              >
+                <Icon name="logout" className="text-black/40" />
+                Log out
+              </button>
+            </form>
+          </div>
+        }
+      />
+      <main className="min-w-0 flex-1 px-4 py-6 md:px-8 md:py-8">
+        <div className="mx-auto max-w-5xl">{children}</div>
+      </main>
     </div>
   );
 }

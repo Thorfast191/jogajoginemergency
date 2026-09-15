@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Jogajog Emergency — QR stickers + emergency profile",
+  title: "Jogajog Emergency — QR stickers that get lost things home",
   description:
     "Buy a QR sticker for your bike, bag, helmet or car — a one-time purchase. It links to a private emergency profile you control: whoever finds your item (or reaches a first responder) sees only what you chose to share, and can contact you without your phone number.",
 };
@@ -24,7 +24,14 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {/* Scroll reveal starts content hidden; without JavaScript nothing
+            would ever reveal it, so show everything. */}
+        <noscript>
+          <style>{".reveal{opacity:1!important;transform:none!important}"}</style>
+        </noscript>
+        {children}
+      </body>
     </html>
   );
 }

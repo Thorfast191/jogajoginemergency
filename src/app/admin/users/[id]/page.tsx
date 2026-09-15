@@ -36,6 +36,11 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
   if (!user) notFound();
   const staffAccount = isStaff(user.role);
 
+  const [scanCount, messageCount] = await Promise.all([
+    prisma.scanEvent.count({ where: { tag: { userId: user.id } } }),
+    prisma.relayMessage.count({ where: { tag: { userId: user.id } } }),
+  ]);
+
   return (
     <div>
       <Link href="/admin/users" className="text-sm text-black/50 hover:underline">
@@ -77,8 +82,11 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
           </p>
         </div>
         <div className="rounded-lg border border-black/10 p-4">
-          <p className="text-black/50">Tags</p>
+          <p className="text-black/50">QR codes</p>
           <p className="mt-1 font-semibold">{user.tags.length}</p>
+          <p className="mt-0.5 text-xs text-black/40">
+            {scanCount} scans · {messageCount} finder messages
+          </p>
         </div>
         <div className="rounded-lg border border-black/10 p-4">
           <p className="text-black/50">Subscription</p>
