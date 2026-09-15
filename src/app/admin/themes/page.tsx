@@ -30,10 +30,7 @@ export default async function AdminThemesPage() {
               <ThemeMascot mascot={t.mascot} className="h-16 w-16 text-[var(--skin-accent)]" />
             </div>
             <div className="p-3">
-              <div className="flex items-center justify-between gap-2">
-                <p className="font-semibold">{t.name}</p>
-                
-              </div>
+              <p className="font-semibold">{t.name}</p>
               <p className="mt-0.5 font-mono text-xs text-black/40">{t.slug}</p>
               <p className="mt-1 text-xs text-black/50">
                 {t.status} · {t._count.products} products · {t._count.tags} tags

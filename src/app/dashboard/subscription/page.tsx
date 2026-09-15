@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 const INCLUDED = [
   ["Your page goes live", "Every QR you have starts showing the information you chose to share."],
   ["Emergency details", "Blood group, allergies, medical notes and your emergency contacts."],
-  ["Portfolio and themes", "A short bio, your links, and any theme on any tag."],
+  ["Portfolio and scan history", "A short bio, your links, and the full scan history of every tag."],
 ];
 
 const WITHOUT_IT = [

@@ -48,10 +48,7 @@ export default async function ThemesPage() {
                   />
                 </div>
                 <div className="bg-white p-4">
-                  <div className="flex items-center justify-between gap-2">
-                    <h2 className="font-bold">{t.name}</h2>
-
-                  </div>
+                  <h2 className="font-bold">{t.name}</h2>
                   <p className="mt-1 text-sm text-black/60">{t.tagline}</p>
                   {t.products.length > 0 && (
                     <p className="mt-3 flex flex-wrap gap-2">

@@ -23,8 +23,7 @@ export const loginSchema = z.object({
 
 // --- Customer tag management ----------------------------------------
 // Customers set an optional private nickname and flip status between the
-// owner-controlled states. Inventory states (UNASSIGNED / ALLOCATED) are
-// admin-only.
+// owner-controlled states.
 
 export const tagCustomerUpdateSchema = z.object({
   internalLabel: z.string().max(100).optional().nullable(),
@@ -124,7 +123,7 @@ export const privacyPresetSchema = z.object({
   preset: z.enum(["MINIMAL", "STANDARD", "FULL"]),
 });
 
-// --- Store: checkout & claim ---------------------------------------
+// --- Store: checkout ----------------------------------------------
 
 export const checkoutSchema = z.object({
   // Minted per rendered checkout form; Order.idempotencyKey is unique, so a
@@ -136,10 +135,6 @@ export const checkoutSchema = z.object({
   shipAddress: z.string().max(200).optional().nullable(),
   shipCity: z.string().max(200).optional().nullable(),
   shipNote: z.string().max(200).optional().nullable(),
-});
-
-export const claimSchema = z.object({
-  code: z.string().min(1).max(40),
 });
 
 // --- Admin: products & orders -------------------------------------
@@ -196,10 +191,4 @@ export const orderStatusSchema = z.object({
 
 export const fulfillmentStatusSchema = z.object({
   status: z.enum(["UNFULFILLED", "PROCESSING", "SHIPPED", "DELIVERED"]),
-});
-
-export const tagBatchSchema = z.object({
-  quantity: z.coerce.number().int().min(1).max(500),
-  productId: z.string().optional().nullable(),
-  label: z.string().min(1).max(120),
 });

@@ -25,8 +25,7 @@ export default async function AdminSubscriptionsPage() {
     <div>
       <h1 className="text-2xl font-bold">Subscriptions</h1>
       <p className="mt-1 text-sm text-black/60">
-        Customer subscriptions and entitlement. Payments run through the <span className="font-mono">DEMO</span>{" "}
-        provider until a live gateway is integrated.
+        Customer subscriptions and entitlement.
       </p>
 
       <div className="mt-6 overflow-x-auto rounded-lg border border-black/10">

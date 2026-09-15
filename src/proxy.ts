@@ -24,10 +24,7 @@ export default auth((req) => {
     if (role !== "ADMIN") return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 
-  const customerArea =
-    pathname.startsWith("/dashboard") ||
-    pathname.startsWith("/checkout") ||
-    pathname.startsWith("/claim");
+  const customerArea = pathname.startsWith("/dashboard") || pathname.startsWith("/checkout");
 
   if (customerArea) {
     if (!isLoggedIn) return loginRedirect();
@@ -38,5 +35,5 @@ export default auth((req) => {
 });
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/admin/:path*", "/checkout/:path*", "/claim/:path*"],
+  matcher: ["/dashboard/:path*", "/admin/:path*", "/checkout/:path*"],
 };

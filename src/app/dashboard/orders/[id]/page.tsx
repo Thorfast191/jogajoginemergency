@@ -45,9 +45,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                   <Link href={`/dashboard/tags/${t.id}`} className="font-mono text-emerald-700 hover:underline">
                     /t/{t.shortCode}
                   </Link>
-                  <span className="text-black/50">
-                    claim <span className="font-mono"></span>
-                  </span>
+                  <span className="text-black/50">{t.status}</span>
                 </li>
               ))}
             </ul>

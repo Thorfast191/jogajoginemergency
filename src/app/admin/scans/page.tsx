@@ -69,14 +69,8 @@ export default async function AdminScansPage() {
               <tr key={scan.id} className="border-b border-black/5 last:border-b-0 align-top">
                 <td className="py-3 px-4 font-mono">{scan.tag.shortCode}</td>
                 <td className="py-3 px-4">
-                  {scan.tag.user ? (
-                    <>
-                      {scan.tag.user.name}
-                      <div className="text-xs text-black/40">{scan.tag.user.email}</div>
-                    </>
-                  ) : (
-                    <span className="text-black/40">Unassigned</span>
-                  )}
+                  {scan.tag.user.name}
+                  <div className="text-xs text-black/40">{scan.tag.user.email}</div>
                 </td>
                 <td className="py-3 px-4">{scan.scannedAt.toLocaleString()}</td>
                 <td className="py-3 px-4">

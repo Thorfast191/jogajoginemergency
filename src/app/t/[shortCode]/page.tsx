@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
+import { after } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getClientIp } from "@/lib/client-ip";
 import { hashIp } from "@/lib/hash";
@@ -53,36 +54,48 @@ export default async function ScanPage({ params }: { params: Promise<{ shortCode
   // Scan logging — hashed IP only, rate-limited. Logged even for a dormant
   // page: the owner should see that people are scanning, since that is the
   // strongest reason to renew.
+  //
+  // It runs after the response is sent. Someone standing over an injured
+  // rider must not wait on a database write and an SMTP round trip before the
+  // blood group appears. Request headers can't be read inside `after` from a
+  // page, so everything it needs is captured here first.
   const ip = await getClientIp();
-  const { allowed } = await rateLimit(`scan:${ip}`, { limit: 30, windowMs: 60_000 });
-  if (allowed) {
-    const h = await headers();
-    const location = approxLocationFrom(h);
-    const scannedAt = new Date();
-    await prisma.scanEvent.create({
-      data: {
-        tagId: tag.id,
-        ipHash: hashIp(ip),
-        userAgent: h.get("user-agent")?.slice(0, 300),
-        ...location,
-      },
-    });
+  const h = await headers();
+  const userAgent = h.get("user-agent")?.slice(0, 300);
+  const location = approxLocationFrom(h);
+  const owner = { id: tag.userId, email: tag.user.email, notify: tag.user.notifyOnScan };
+  const tagLabel = tag.internalLabel ?? tag.product?.name ?? `/t/${shortCode}`;
 
-    // Tell the owner — but at most once every ten minutes per tag, so someone
-    // refreshing the page does not fill an inbox. Failures are swallowed: a
-    // finder must never see an error because our mail host is down.
-    const notifiable = await rateLimit(`scan-notify:${tag.id}`, { limit: 1, windowMs: 10 * 60_000 });
-    if (notifiable.allowed && tag.user.notifyOnScan) {
-      await notifyOwnerOfScan({
-        userId: tag.userId,
-        ownerEmail: tag.user.email,
-        tagId: tag.id,
-        tagLabel: tag.internalLabel ?? tag.product?.name ?? `/t/${shortCode}`,
-        scannedAt,
-        approxLocation: formatLocation(location),
-      }).catch(() => {});
+  after(async () => {
+    try {
+      const { allowed } = await rateLimit(`scan:${ip}`, { limit: 30, windowMs: 60_000 });
+      if (!allowed) return;
+
+      const scannedAt = new Date();
+      await prisma.scanEvent.create({
+        data: { tagId: tag.id, ipHash: hashIp(ip), userAgent, scannedAt, ...location },
+      });
+
+      // Tell the owner — but at most once every ten minutes per tag, so
+      // someone refreshing the page does not fill an inbox.
+      const notifiable = await rateLimit(`scan-notify:${tag.id}`, {
+        limit: 1,
+        windowMs: 10 * 60_000,
+      });
+      if (notifiable.allowed && owner.notify) {
+        await notifyOwnerOfScan({
+          userId: owner.id,
+          ownerEmail: owner.email,
+          tagId: tag.id,
+          tagLabel,
+          scannedAt,
+          approxLocation: formatLocation(location),
+        });
+      }
+    } catch (e) {
+      console.error("[scan] logging failed:", e);
     }
-  }
+  });
 
   const skin = resolveScanTheme(tag.theme as ThemeSkin | null);
   const entitled = await userIsEntitled(tag.userId);
