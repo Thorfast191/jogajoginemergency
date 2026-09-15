@@ -6,6 +6,7 @@ import {
   updateOrderStatusAction,
   updateFulfillmentAction,
   issueReplacementTagAction,
+  sendQrReminderAction,
 } from "./actions";
 
 const ORDER_STATUSES = ["PENDING", "PAID", "CANCELLED", "REFUNDED"];
@@ -73,6 +74,33 @@ export function OrderControls({
         </select>
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}
+    </div>
+  );
+}
+
+export function RemindCustomerButton({ orderId }: { orderId: string }) {
+  const [pending, start] = useTransition();
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  return (
+    <div className="inline-flex flex-col items-start gap-1">
+      <button
+        onClick={() =>
+          start(async () => {
+            const res = await sendQrReminderAction(orderId);
+            setMsg(res.error ? { ok: false, text: res.error } : { ok: true, text: "Reminder sent." });
+          })
+        }
+        disabled={pending}
+        className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-60"
+      >
+        {pending ? "Sending…" : "Remind customer"}
+      </button>
+      {msg && (
+        <span className={`text-[11px] ${msg.ok ? "text-[var(--color-primary-dark)]" : "text-red-600"}`}>
+          {msg.text}
+        </span>
+      )}
     </div>
   );
 }

@@ -110,6 +110,31 @@ export function renderPasswordReset(p: { resetUrl: string }): Rendered {
   return { subject, text, html };
 }
 
+export function renderQrReminder(p: { count: number; tagsUrl: string }): Rendered {
+  const codes = `${p.count} QR ${p.count === 1 ? "code" : "codes"}`;
+  const subject =
+    p.count === 1
+      ? "Your sticker is waiting for its QR code"
+      : "Your stickers are waiting for their QR codes";
+  const text = [
+    "Thanks for your order! Each sticker is printed with your own QR code in the middle, so we",
+    "can't print yours until you've generated them.",
+    "",
+    `You have ${codes} left to generate:`,
+    p.tagsUrl,
+    "",
+    "It takes a few seconds, and you choose exactly what each one shows.",
+  ].join("\n");
+  const html = layout(
+    subject,
+    `<p style="margin:0">Thanks for your order! Each sticker is printed with your own QR code in the middle, so we can&#39;t print yours until you&#39;ve generated them.</p>
+<p style="margin:12px 0 0">You have <strong>${escapeHtml(codes)}</strong> left to generate. It takes a few seconds, and you choose exactly what each one shows.</p>`,
+    p.tagsUrl,
+    "Generate my QR codes",
+  );
+  return { subject, text, html };
+}
+
 export function renderSubscriptionExpiring(p: {
   daysLeft: number;
   renewUrl: string;

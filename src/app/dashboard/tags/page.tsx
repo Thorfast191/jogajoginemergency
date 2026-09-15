@@ -2,7 +2,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCustomer } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { generateTagQrDataUrl } from "@/lib/qr";
 import { slotBalanceForUser } from "@/lib/slots-server";
 import { userIsEntitled } from "@/lib/subscription";
 import { EmptyTags } from "@/components/illustrations";
@@ -31,16 +30,14 @@ export default async function TagsPage() {
     userIsEntitled(user.id),
   ]);
 
-  const qrCodes = await Promise.all(tags.map((t) => generateTagQrDataUrl(t.shortCode)));
-
   return (
     <div>
       <PageHeader
         title="My QR codes"
         subtitle={
           <>
-            Generate a code for each sticker you bought, then print or stick it on. What a finder
-            sees comes from your{" "}
+            Generate a code for each sticker you bought — it&apos;s printed into the empty square in
+            the middle of your sticker&apos;s artwork. What a finder sees comes from your{" "}
             <Link href="/dashboard/profile" className="text-[var(--color-primary)] hover:underline">
               profile
             </Link>
@@ -71,12 +68,17 @@ export default async function TagsPage() {
           <p className="mt-4 font-semibold">No QR codes yet</p>
         </div>
       ) : (
-        <ul className="mt-8 grid gap-4 sm:grid-cols-2">
-          {tags.map((tag, i) => (
+        <ul className="mt-8 grid gap-4 sm:grid-cols-2 anim-stagger">
+          {tags.map((tag) => (
             <li key={tag.id} className="rounded-2xl border border-black/10 bg-white p-4 hover-lift">
               <Link href={`/dashboard/tags/${tag.id}`} className="flex items-center gap-4">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={qrCodes[i]} alt="" className="h-20 w-20 shrink-0 rounded-lg" />
+                <img
+                  src={`/api/tags/${tag.id}/sticker?size=thumb`}
+                  alt=""
+                  loading="lazy"
+                  className="h-24 w-24 shrink-0 rounded-xl border border-black/5 bg-black/[0.03] object-contain"
+                />
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-semibold">
                     {tag.internalLabel ?? tag.product?.name ?? "Untitled"}

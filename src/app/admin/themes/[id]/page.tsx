@@ -4,8 +4,6 @@ import { prisma } from "@/lib/prisma";
 import { getStaffWith } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { Forbidden } from "@/components/admin/forbidden";
-import { themeCssVars, type ThemeSkin } from "@/lib/themes";
-import { ThemeMascot } from "@/components/illustrations";
 import { ThemeForm } from "../theme-form";
 import { ArchiveThemeButton } from "./archive-button";
 import { ThemeArtUpload } from "./art-upload";
@@ -36,18 +34,15 @@ export default async function AdminThemeDetailPage({
         {theme._count.products} products · {theme._count.tags} tags using this skin
       </p>
 
-      <div
-        style={themeCssVars(theme as ThemeSkin) as React.CSSProperties}
-        className="mt-4 grid h-40 max-w-2xl place-items-center rounded-xl border border-black/10 bg-[var(--skin-bg)]"
-      >
-        <ThemeMascot mascot={theme.mascot} className="h-24 w-24 text-[var(--skin-accent)] anim-float" />
-      </div>
-
-      <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_20rem]">
+      <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_22rem]">
         <ThemeForm theme={theme} />
         <div>
           <h2 className="mb-3 font-semibold">Sticker artwork</h2>
-          <ThemeArtUpload themeId={theme.id} artAssetId={theme.artAssetId} />
+          <ThemeArtUpload
+            themeId={theme.id}
+            artAssetId={theme.artAssetId}
+            previewVersion={theme.updatedAt.getTime()}
+          />
         </div>
       </div>
 

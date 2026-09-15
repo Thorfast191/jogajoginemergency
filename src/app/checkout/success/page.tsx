@@ -46,8 +46,9 @@ export default async function CheckoutSuccessPage({
       </p>
 
       <ol className="mt-8 space-y-3">
-        <Step n={1} title="Generate your QR codes" done={balance.used > 0}>
-          You have {balance.available} to make. Each one gets its own page.
+        <Step n={1} title="Generate your QR codes" done={balance.available === 0}>
+          You have {balance.available} to make. Each is printed into the middle of your sticker, so
+          we print and ship as soon as they&apos;re done.
         </Step>
         <Step n={2} title="Add your emergency information" done={false}>
           Blood group, allergies, who to call — and choose exactly what a finder sees.

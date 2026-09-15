@@ -2,8 +2,9 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getCustomer } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { generateTagQrDataUrl, tagUrl } from "@/lib/qr";
+import { tagUrl } from "@/lib/qr";
 import { summarizeUserAgent } from "@/lib/user-agent";
+import { Icon } from "@/components/icons";
 import { TagSettingsForm } from "./tag-settings-form";
 import { ThemePicker } from "./theme-picker";
 import type { ThemeSkin } from "@/lib/themes";
@@ -44,8 +45,9 @@ export default async function TagDetailPage({ params }: { params: Promise<{ id: 
 
   if (!tag) notFound();
 
-  const qrDataUrl = await generateTagQrDataUrl(tag.shortCode);
   const url = tagUrl(tag.shortCode);
+  const button =
+    "inline-flex items-center gap-2 rounded-xl border border-black/15 px-3 py-2 text-sm font-medium hover:bg-black/5";
 
   return (
     <div>
@@ -59,34 +61,51 @@ export default async function TagDetailPage({ params }: { params: Promise<{ id: 
 
       <div className="mt-6 grid sm:grid-cols-2 gap-8">
         <div>
-          <div className="rounded-lg border border-black/10 p-6 flex flex-col items-center">
+          <div className="rounded-2xl border border-black/10 bg-white p-5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-black/40">Your sticker</p>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={qrDataUrl} alt="QR code" className="w-48 h-48" />
-            <p className="mt-3 text-xs font-mono text-black/50 break-all text-center">{url}</p>
-            <div className="mt-4 flex gap-2">
+            <img
+              src={`/api/tags/${tag.id}/sticker?size=thumb`}
+              alt="Your sticker: the theme artwork with your QR code printed in the middle"
+              className="mx-auto mt-3 w-full max-w-xs rounded-xl border border-black/5 anim-pop"
+            />
+            <p className="mt-3 break-all text-center font-mono text-xs text-black/50">{url}</p>
+
+            <div className="mt-4 flex flex-wrap justify-center gap-2">
               <a
-                href={`/api/tags/${tag.id}/qr`}
+                href={`/api/tags/${tag.id}/sticker?download=1`}
                 download
-                className="rounded-md bg-emerald-600 text-white px-4 py-2 text-sm font-medium hover:bg-emerald-700"
+                className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-primary)] px-3 py-2 text-sm font-semibold text-white"
               >
-                Download PNG
+                <Icon name="download" />
+                Sticker (PNG)
               </a>
-              <a
-                href={url}
-                target="_blank"
-                rel="noreferrer"
-                className="rounded-md border border-black/15 px-4 py-2 text-sm font-medium hover:bg-black/5"
-              >
-                View public page
+              <a href={`/api/tags/${tag.id}/sticker?format=pdf`} download className={button}>
+                <Icon name="download" />
+                Sticker (PDF)
+              </a>
+              <a href={`/api/tags/${tag.id}/qr`} download className={button}>
+                <Icon name="qr" />
+                QR only
+              </a>
+              <a href={url} target="_blank" rel="noreferrer" className={button}>
+                <Icon name="external" />
+                Public page
               </a>
             </div>
+            <p className="mt-3 text-center text-xs text-black/50">
+              We print and ship the sticker from your order. The PDF is at its real printed size
+              ({tag.product?.stickerWidthMm ?? 60} mm wide) if you ever want to reprint it.
+            </p>
             {tag.orderItem?.orderId && (
-              <Link
-                href={`/dashboard/orders/${tag.orderItem.orderId}`}
-                className="mt-3 text-xs text-emerald-700 hover:underline"
-              >
-                View originating order
-              </Link>
+              <p className="mt-2 text-center">
+                <Link
+                  href={`/dashboard/orders/${tag.orderItem.orderId}`}
+                  className="text-xs text-[var(--color-primary-dark)] hover:underline"
+                >
+                  View originating order
+                </Link>
+              </p>
             )}
           </div>
 

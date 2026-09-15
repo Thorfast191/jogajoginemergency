@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { settlePayment } from "@/lib/payments/settle";
+import { remindAboutNewOrder } from "@/lib/print-server";
 import { appUrl } from "@/lib/payments/config";
 import { cookies } from "next/headers";
 import { CART_COOKIE } from "@/lib/cart";
@@ -62,6 +63,18 @@ async function handle(req: Request): Promise<Response> {
     // case this simply sets a header nobody reads.
     if (outcome.status === "SUCCEEDED") {
       (await cookies()).delete(CART_COOKIE);
+    }
+
+    // Stickers are printed with the customer's QR in them, so a newly paid
+    // order is waiting on the customer. Told once, by the call that paid it,
+    // and after the redirect has gone out so the gateway isn't kept waiting.
+    const paidOrderId = outcome.fulfilledOrderId;
+    if (paidOrderId) {
+      after(() =>
+        remindAboutNewOrder(paidOrderId).catch((e) =>
+          console.error(`[payments] QR reminder failed for order ${paidOrderId}:`, e),
+        ),
+      );
     }
   } catch (e) {
     // A gateway that is down or misconfigured must not lose the customer.

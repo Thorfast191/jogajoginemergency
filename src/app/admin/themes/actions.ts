@@ -6,7 +6,7 @@ import { getStaffWith, requirePermission } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { themeSchema } from "@/lib/validations";
 import { DEFAULT_THEME_SLUG } from "@/lib/theme-access";
-import { processImage, MediaError } from "@/lib/media";
+import { processThemeArt, MediaError, MAX_THEME_ART_BYTES } from "@/lib/media";
 import { audit } from "@/lib/audit";
 
 export type ThemeState = { error?: string; success?: boolean };
@@ -21,6 +21,7 @@ function parse(formData: FormData) {
     inkColor: formData.get("inkColor") || undefined,
     accentColor: formData.get("accentColor") || undefined,
     mascot: formData.get("mascot"),
+    qrBoxSize: formData.get("qrBoxSize") || 40,
     status: formData.get("status"),
     sortOrder: formData.get("sortOrder") || 0,
   });
@@ -90,10 +91,13 @@ export async function archiveThemeAction(id: string): Promise<void> {
 }
 
 /**
- * Upload the artwork printed on a sticker in this theme.
+ * Upload the artwork printed on a sticker in this theme. The design leaves an
+ * empty square in its centre; the customer's QR is composited into it at the
+ * theme's `qrBoxSize`.
  *
- * The old asset is deleted only after the theme points at the new one, so a
- * failure part-way leaves a theme with working art rather than none.
+ * Kept at print quality (see processThemeArt). The old asset is deleted only
+ * after the theme points at the new one, so a failure part-way leaves a theme
+ * with working art rather than none.
  */
 export async function uploadThemeArtAction(
   id: string,
@@ -104,14 +108,14 @@ export async function uploadThemeArtAction(
 
   const file = formData.get("art");
   if (!(file instanceof File) || file.size === 0) return { error: "Choose an image." };
-  if (file.size > 5 * 1024 * 1024) return { error: "Image is larger than 5 MB." };
+  if (file.size > MAX_THEME_ART_BYTES) return { error: "Image is larger than 10 MB." };
 
   const theme = await prisma.theme.findUnique({ where: { id }, select: { artAssetId: true } });
   if (!theme) return { error: "Theme not found." };
 
   let processed;
   try {
-    processed = await processImage(Buffer.from(await file.arrayBuffer()), "PRODUCT_IMAGE");
+    processed = await processThemeArt(Buffer.from(await file.arrayBuffer()));
   } catch (e) {
     return { error: e instanceof MediaError ? e.message : "Could not process that image." };
   }

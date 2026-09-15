@@ -187,6 +187,13 @@ export const themeSchema = z.object({
   inkColor: hexColor("#171717"),
   accentColor: hexColor("#059669"),
   mascot: z.enum(MASCOTS),
+  // The empty centre square the customer's QR is printed into, as a
+  // percentage of the artwork's shorter edge. See src/lib/sticker-layout.ts.
+  qrBoxSize: z.coerce
+    .number()
+    .int()
+    .min(20, "The QR square must be at least 20% of the artwork")
+    .max(80, "The QR square can be at most 80% of the artwork"),
   status: z.enum(["DRAFT", "ACTIVE", "ARCHIVED"]),
   sortOrder: z.coerce.number().int().min(0).max(9999),
 });

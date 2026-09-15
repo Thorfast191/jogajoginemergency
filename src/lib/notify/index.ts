@@ -5,12 +5,18 @@ import {
   renderScan,
   renderPasswordReset,
   renderSubscriptionExpiring,
+  renderQrReminder,
   type Rendered,
 } from "./render";
 
 export { isConfigured } from "./transport";
 
-type Kind = "SCAN" | "RELAY_MESSAGE" | "PASSWORD_RESET" | "SUBSCRIPTION_EXPIRING";
+type Kind =
+  | "SCAN"
+  | "RELAY_MESSAGE"
+  | "PASSWORD_RESET"
+  | "SUBSCRIPTION_EXPIRING"
+  | "QR_GENERATION_REMINDER";
 
 function appUrl(): string {
   return process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
@@ -97,6 +103,20 @@ export async function notifyPasswordReset(params: {
   resetUrl: string;
 }): Promise<void> {
   await send("PASSWORD_RESET", params.email, renderPasswordReset({ resetUrl: params.resetUrl }));
+}
+
+/** Stickers are printed with the QR in them; this tells a customer we're waiting on theirs. */
+export async function notifyQrGenerationNeeded(params: {
+  userId: string;
+  email: string;
+  count: number;
+}): Promise<void> {
+  await send(
+    "QR_GENERATION_REMINDER",
+    params.email,
+    renderQrReminder({ count: params.count, tagsUrl: `${appUrl()}/dashboard/tags` }),
+    params.userId,
+  );
 }
 
 export async function notifySubscriptionExpiring(params: {

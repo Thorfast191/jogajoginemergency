@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { escapeHtml, renderRelayMessage, renderScan, renderPasswordReset } from "../notify/render";
+import {
+  escapeHtml,
+  renderRelayMessage,
+  renderScan,
+  renderPasswordReset,
+  renderQrReminder,
+} from "../notify/render";
 
 describe("escapeHtml", () => {
   it("neutralises every character that can break out of markup", () => {
@@ -102,5 +108,22 @@ describe("renderPasswordReset", () => {
 
   it("says how long the link lasts", () => {
     expect(renderPasswordReset({ resetUrl: "https://x.example" }).text).toMatch(/hour/i);
+  });
+});
+
+describe("renderQrReminder", () => {
+  const tagsUrl = "https://example.com/dashboard/tags";
+
+  it("says a QR is what the print is waiting on, and links to where to make it", () => {
+    const { subject, text, html } = renderQrReminder({ count: 1, tagsUrl });
+    expect(subject).toMatch(/QR/);
+    expect(text).toContain(tagsUrl);
+    expect(html).toContain(tagsUrl);
+    expect(text).toMatch(/print/i);
+  });
+
+  it("counts codes in the singular and the plural", () => {
+    expect(renderQrReminder({ count: 1, tagsUrl }).text).toContain("1 QR code ");
+    expect(renderQrReminder({ count: 3, tagsUrl }).text).toContain("3 QR codes");
   });
 });

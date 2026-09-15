@@ -4,8 +4,10 @@ import { getStaffWith } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/money";
 import { can } from "@/lib/permissions";
+import { printReadiness } from "@/lib/print";
 import { Forbidden } from "@/components/admin/forbidden";
-import { OrderControls, ReplacementButton } from "../order-controls";
+import { Icon } from "@/components/icons";
+import { OrderControls, RemindCustomerButton, ReplacementButton } from "../order-controls";
 
 export const dynamic = "force-dynamic";
 
@@ -22,11 +24,30 @@ export default async function AdminOrderDetailPage({
     where: { id },
     include: {
       user: { select: { id: true, name: true, email: true } },
-      items: { include: { product: true, tags: true } },
+      items: {
+        orderBy: { id: "asc" },
+        include: {
+          product: true,
+          tags: {
+            orderBy: { createdAt: "asc" },
+            include: { theme: { select: { name: true } } },
+          },
+        },
+      },
       payments: { orderBy: { createdAt: "desc" } },
     },
   });
   if (!order) notFound();
+
+  const readiness = printReadiness(
+    order.items.map((i) => ({
+      quantity: i.quantity,
+      qrSlots: i.product.qrSlots,
+      tagsGenerated: i.tags.length,
+    })),
+  );
+  const printable = order.items.some((i) => i.tags.some((t) => t.status !== "DEACTIVATED"));
+  const canSeeMoney = can(admin.role, "money.manage");
 
   return (
     <div>
@@ -40,49 +61,116 @@ export default async function AdminOrderDetailPage({
         </Link>
       </p>
 
-      <div className="mt-6 grid md:grid-cols-[1fr_220px] gap-8">
+      {order.status === "PAID" && (
+        <div
+          className={`mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-sm ${
+            readiness.ready
+              ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+              : "border-amber-200 bg-amber-50 text-amber-900"
+          }`}
+        >
+          <p>
+            {readiness.ready ? (
+              <strong>Ready to print — every QR code is generated.</strong>
+            ) : (
+              <>
+                <strong>Waiting for the customer:</strong> {readiness.generated} of {readiness.needed}{" "}
+                QR codes generated. Printing unlocks when they&apos;re all done.
+              </>
+            )}
+          </p>
+          {readiness.ready ? (
+            printable && (
+              <a
+                href={`/api/orders/${order.id}/stickers`}
+                className="inline-flex items-center gap-2 rounded-lg bg-[var(--color-primary)] px-3 py-1.5 text-xs font-semibold text-white"
+              >
+                <Icon name="download" width={16} height={16} />
+                Download print PDF
+              </a>
+            )
+          ) : (
+            <RemindCustomerButton orderId={order.id} />
+          )}
+        </div>
+      )}
+
+      <div className="mt-6 grid md:grid-cols-[1fr_240px] gap-8">
         <div className="space-y-6">
           {order.items.map((item) => (
-            <div key={item.id} className="rounded-lg border border-black/10 p-4">
-              <div className="flex justify-between">
+            <div key={item.id} className="rounded-2xl border border-black/10 bg-white p-4">
+              <div className="flex justify-between gap-3">
                 <span className="font-medium">{item.product.name}</span>
-                <span>
+                <span className="text-sm">
                   {item.quantity} × {formatPrice(item.unitPriceCents, item.currency)}
                 </span>
               </div>
-              <ul className="mt-3 space-y-1 text-sm">
-                {item.tags.map((t) => (
-                  <li key={t.id} className="flex justify-between font-mono text-xs">
-                    <span>/t/{t.shortCode}</span>
-                    <span className="text-black/50">{t.status}</span>
-                  </li>
-                ))}
-              </ul>
+              <p className="mt-0.5 text-xs text-black/50">
+                {item.quantity * item.product.qrSlots} QR code
+                {item.quantity * item.product.qrSlots === 1 ? "" : "s"} · printed{" "}
+                {item.product.stickerWidthMm} mm wide
+              </p>
+
+              {item.tags.length === 0 ? (
+                <p className="mt-3 text-sm text-black/50">No QR codes generated for this line yet.</p>
+              ) : (
+                <ul className="mt-3 grid gap-3 sm:grid-cols-2">
+                  {item.tags.map((t) => (
+                    <li key={t.id} className="flex gap-3 rounded-xl border border-black/10 p-2">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={`/api/tags/${t.id}/sticker?size=thumb`}
+                        alt=""
+                        loading="lazy"
+                        className="h-20 w-20 shrink-0 rounded-lg bg-black/[0.03] object-contain"
+                      />
+                      <div className="min-w-0 text-xs">
+                        <Link href={`/admin/tags/${t.id}`} className="font-mono hover:underline">
+                          /t/{t.shortCode}
+                        </Link>
+                        <p className="text-black/50">
+                          {t.status} · {t.theme?.name ?? "Default theme"}
+                        </p>
+                        <p className="mt-1 flex gap-2">
+                          <a href={`/api/tags/${t.id}/sticker?download=1`} className="text-[var(--color-primary-dark)] hover:underline">
+                            PNG
+                          </a>
+                          <a href={`/api/tags/${t.id}/sticker?format=pdf`} className="text-[var(--color-primary-dark)] hover:underline">
+                            PDF
+                          </a>
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
               <div className="mt-3">
                 <ReplacementButton orderItemId={item.id} />
               </div>
             </div>
           ))}
 
-          <div className="rounded-lg border border-black/10 p-4">
-            <h2 className="font-semibold text-sm">Payments</h2>
-            <ul className="mt-2 text-sm">
-              {order.payments.map((p) => (
-                <li key={p.id} className="flex justify-between">
-                  <span>
-                    {formatPrice(p.amountCents, p.currency)} · {p.provider}
-                  </span>
-                  <span className="text-black/50">
-                    {p.status} · {p.createdAt.toLocaleDateString()}
-                  </span>
-                </li>
-              ))}
-              {order.payments.length === 0 && <li className="text-black/50">No payments.</li>}
-            </ul>
-          </div>
+          {canSeeMoney && (
+            <div className="rounded-2xl border border-black/10 bg-white p-4">
+              <h2 className="font-semibold text-sm">Payments</h2>
+              <ul className="mt-2 text-sm">
+                {order.payments.map((p) => (
+                  <li key={p.id} className="flex justify-between">
+                    <span>
+                      {formatPrice(p.amountCents, p.currency)} · {p.provider}
+                    </span>
+                    <span className="text-black/50">
+                      {p.status} · {p.createdAt.toLocaleDateString()}
+                    </span>
+                  </li>
+                ))}
+                {order.payments.length === 0 && <li className="text-black/50">No payments.</li>}
+              </ul>
+            </div>
+          )}
 
           {(order.shipName || order.shipAddress) && (
-            <div className="rounded-lg border border-black/10 p-4 text-sm">
+            <div className="rounded-2xl border border-black/10 bg-white p-4 text-sm">
               <h2 className="font-semibold">Shipping</h2>
               <p className="mt-1 text-black/70">
                 {[order.shipName, order.shipPhone, order.shipAddress, order.shipCity]
@@ -94,7 +182,7 @@ export default async function AdminOrderDetailPage({
           )}
         </div>
 
-        <div className="rounded-lg border border-black/10 p-4 h-fit">
+        <div className="rounded-2xl border border-black/10 bg-white p-4 h-fit">
           <p className="text-sm">
             Total: <span className="font-semibold">{formatPrice(order.totalCents, order.currency)}</span>
           </p>
@@ -103,7 +191,7 @@ export default async function AdminOrderDetailPage({
               orderId={order.id}
               status={order.status}
               fulfillmentStatus={order.fulfillmentStatus}
-              canChangeStatus={can(admin.role, "money.manage")}
+              canChangeStatus={canSeeMoney}
             />
           </div>
         </div>

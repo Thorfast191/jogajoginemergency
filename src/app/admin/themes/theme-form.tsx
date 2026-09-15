@@ -3,6 +3,8 @@
 import { useActionState } from "react";
 import { createThemeAction, updateThemeAction, type ThemeState } from "./actions";
 import { MASCOTS } from "@/lib/themes";
+import { QR_BOX_DEFAULT } from "@/lib/sticker-layout";
+import { QrBoxField } from "./qr-box-field";
 
 const initial: ThemeState = {};
 
@@ -16,11 +18,13 @@ type Theme = {
   inkColor: string;
   accentColor: string;
   mascot: string;
+  qrBoxSize: number;
+  artAssetId: string | null;
   status: string;
   sortOrder: number;
 };
 
-const input = "w-full rounded-md border border-black/15 px-3 py-2 text-sm";
+const input = "w-full rounded-lg border border-black/15 bg-white px-3 py-2 text-sm";
 
 function Colour({ name, label, value }: { name: string; label: string; value?: string }) {
   return (
@@ -56,6 +60,9 @@ export function ThemeForm({ theme }: { theme?: Theme }) {
       <label className="block">
         <span className="mb-1 block text-xs font-medium">Tagline</span>
         <input name="tagline" required defaultValue={theme?.tagline} className={input} />
+        <span className="mt-1 block text-xs text-black/40">
+          Shown under the wordmark on the scan page, and printed on generated artwork.
+        </span>
       </label>
 
       <div className="grid gap-3 sm:grid-cols-4">
@@ -64,6 +71,12 @@ export function ThemeForm({ theme }: { theme?: Theme }) {
         <Colour name="inkColor" label="Ink" value={theme?.inkColor ?? "#171717"} />
         <Colour name="accentColor" label="Accent" value={theme?.accentColor ?? "#059669"} />
       </div>
+
+      <QrBoxField
+        defaultValue={theme?.qrBoxSize ?? QR_BOX_DEFAULT}
+        artSrc={theme?.artAssetId ? `/media/${theme.artAssetId}` : null}
+        colours={{ bg: theme?.bgColor ?? "#FBF9F6", accent: theme?.accentColor ?? "#059669" }}
+      />
 
       <div className="grid gap-3 sm:grid-cols-3">
         <label className="block">
@@ -97,12 +110,12 @@ export function ThemeForm({ theme }: { theme?: Theme }) {
       </div>
 
       {state.error && <p className="text-sm text-red-600">{state.error}</p>}
-      {state.success && <p className="text-sm text-emerald-700">Saved.</p>}
+      {state.success && <p className="text-sm text-[var(--color-primary-dark)]">Saved.</p>}
 
       <button
         type="submit"
         disabled={pending}
-        className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
+        className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
       >
         {pending ? "Saving…" : theme ? "Save theme" : "Create theme"}
       </button>

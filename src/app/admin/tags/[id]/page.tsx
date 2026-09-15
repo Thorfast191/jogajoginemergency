@@ -96,7 +96,28 @@ export default async function AdminTagDetailPage({ params }: { params: Promise<{
         </div>
 
         <div>
-          <h2 className="font-semibold">Recent scans</h2>
+          <h2 className="font-semibold">Sticker</h2>
+          <div className="mt-3 rounded-2xl border border-black/10 bg-white p-4">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={`/api/tags/${tag.id}/sticker?size=thumb`}
+              alt="The customer's sticker with this QR in the centre"
+              className="mx-auto w-full max-w-[16rem] rounded-xl"
+            />
+            <p className="mt-3 flex flex-wrap justify-center gap-3 text-sm">
+              <a href={`/api/tags/${tag.id}/sticker?download=1`} className="text-[var(--color-primary-dark)] hover:underline">
+                Sticker PNG
+              </a>
+              <a href={`/api/tags/${tag.id}/sticker?format=pdf`} className="text-[var(--color-primary-dark)] hover:underline">
+                Sticker PDF
+              </a>
+              <a href={`/api/tags/${tag.id}/qr`} className="text-[var(--color-primary-dark)] hover:underline">
+                QR only
+              </a>
+            </p>
+          </div>
+
+          <h2 className="mt-8 font-semibold">Recent scans</h2>
           {scans.length === 0 ? (
             <p className="mt-2 text-sm text-black/50">No scans yet.</p>
           ) : (

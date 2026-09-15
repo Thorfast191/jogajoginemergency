@@ -9,6 +9,8 @@ export type SettleOutcome = {
   /** Where to send the customer afterwards. */
   redirectTo: string;
   reason?: string;
+  /** Set when this call is the one that marked an order paid. */
+  fulfilledOrderId?: string;
 };
 
 /**
@@ -108,5 +110,11 @@ export async function settlePayment(
     }
   });
 
-  return { status: next, redirectTo: next === "SUCCEEDED" ? done : failed, reason };
+  return {
+    status: next,
+    redirectTo: next === "SUCCEEDED" ? done : failed,
+    reason,
+    fulfilledOrderId:
+      next === "SUCCEEDED" && payment.kind === "ORDER" ? payment.order?.id : undefined,
+  };
 }
