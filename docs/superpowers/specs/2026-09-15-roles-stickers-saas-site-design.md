@@ -78,7 +78,9 @@ Data:
 `src/lib/sticker.ts`:
 - `qrBox(width, height, sizePct)` — pure; the centred square in whole pixels.
 - `defaultArtworkSvg(theme)` — when a theme has no artwork: theme background,
-  wordmark and mascot at the top, a white centred square, the tagline beneath.
+  the wordmark and an emergency emblem at the top, a white centred square, the
+  tagline beneath. (The mascots are React components; an emblem drawn as a plain
+  SVG string keeps the renderer free of React server rendering.)
 - `renderSticker({ art, theme, url })` — composites a black-on-white QR (error
   correction `Q`, integer module scale, white quiet zone) into the square with
   `sharp`. PNG out.
