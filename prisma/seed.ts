@@ -199,7 +199,8 @@ async function main() {
   }
   console.log(`Seeded ${THEMES.length} themes.`);
 
-  // The first admin. The password is taken from the environment, and otherwise
+  // The first admin, created as a super admin: somebody has to be able to
+  // appoint the others. The password is taken from the environment, and otherwise
   // generated — a seed that ships a known password puts the same credentials on
   // every deployment that ever runs it, and the one account that can suspend
   // users and edit the store is the worst place for that.
@@ -213,7 +214,7 @@ async function main() {
         name: "Jogajog Admin",
         email: adminEmail,
         passwordHash: await bcrypt.hash(password, 10),
-        role: "ADMIN",
+        role: "SUPER_ADMIN",
       },
     });
     console.log(`Created admin user: ${adminEmail}`);

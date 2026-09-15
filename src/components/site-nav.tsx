@@ -2,6 +2,7 @@ import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { readCart } from "@/lib/cart-server";
 import { cartCount } from "@/lib/cart";
+import { isStaff } from "@/lib/permissions";
 
 export async function SiteNav() {
   const [session, cart] = await Promise.all([auth(), readCart()]);
@@ -34,7 +35,7 @@ export async function SiteNav() {
           </Link>
           {session?.user ? (
             <Link
-              href={session.user.role === "ADMIN" ? "/admin" : "/dashboard"}
+              href={isStaff(session.user.role) ? "/admin" : "/dashboard"}
               className="rounded-xl bg-[var(--color-primary)] px-4 py-2 font-semibold text-white transition-transform hover:scale-[1.03]"
             >
               Dashboard

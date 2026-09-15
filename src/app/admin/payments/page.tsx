@@ -1,7 +1,7 @@
-import { redirect } from "next/navigation";
-import { getAdmin } from "@/lib/session";
+import { getStaffWith } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/money";
+import { Forbidden } from "@/components/admin/forbidden";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +12,7 @@ const statusColors: Record<string, string> = {
 };
 
 export default async function AdminPaymentsPage() {
-  if (!(await getAdmin())) redirect("/dashboard");
+  if (!(await getStaffWith("money.manage"))) return <Forbidden />;
 
   const payments = await prisma.payment.findMany({
     include: {
@@ -43,8 +43,7 @@ export default async function AdminPaymentsPage() {
     <div>
       <h1 className="text-2xl font-bold">Payments</h1>
       <p className="mt-1 text-sm text-black/60">
-        All order and subscription payments. No live gateway is wired up yet — these are{" "}
-        <span className="font-mono">DEMO</span> records.
+        All order and subscription payments, across every gateway.
       </p>
 
       <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">

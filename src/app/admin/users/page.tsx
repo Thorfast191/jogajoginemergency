@@ -1,18 +1,36 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { getAdmin } from "@/lib/session";
+import { getStaffWith } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
+import { can, isStaff, roleLabel } from "@/lib/permissions";
+import { Forbidden } from "@/components/admin/forbidden";
 import { UserStatusToggle } from "./status-toggle";
 
 export const dynamic = "force-dynamic";
 
+// Kept out of the component body so the render stays free of impure calls.
+function now(): Date {
+  return new Date();
+}
+
+const ROLE_TONE: Record<string, string> = {
+  USER: "bg-emerald-100 text-emerald-700",
+  ADMIN: "bg-sky-100 text-sky-700",
+  SUPER_ADMIN: "bg-violet-100 text-violet-700",
+};
+
 export default async function AdminUsersPage() {
-  if (!(await getAdmin())) redirect("/dashboard");
+  const admin = await getStaffWith("users.manage");
+  if (!admin) return <Forbidden />;
+  const canSuspend = can(admin.role, "destructive");
 
   const users = await prisma.user.findMany({
     include: {
       _count: { select: { tags: true } },
-      subscriptions: { where: { status: "ACTIVE" }, include: { plan: true }, orderBy: { createdAt: "desc" } },
+      subscriptions: {
+        where: { status: { in: ["ACTIVE", "TRIALING"] }, currentPeriodEnd: { gt: now() } },
+        include: { plan: true },
+        orderBy: { currentPeriodEnd: "desc" },
+      },
     },
     orderBy: [{ role: "asc" }, { createdAt: "desc" }],
   });
@@ -22,10 +40,10 @@ export default async function AdminUsersPage() {
       <h1 className="text-2xl font-bold">Users</h1>
       <p className="mt-1 text-sm text-black/60">
         Customer accounts and their entitlement. Admin accounts are shown for reference and are
-        protected from changes here.
+        managed under Admins.
       </p>
 
-      <div className="mt-6 overflow-x-auto rounded-lg border border-black/10">
+      <div className="mt-6 overflow-x-auto rounded-2xl border border-black/10 bg-white">
         <table className="w-full text-sm border-collapse">
           <thead>
             <tr className="text-left text-black/50 border-b border-black/10">
@@ -42,31 +60,27 @@ export default async function AdminUsersPage() {
             {users.map((u) => (
               <tr key={u.id} className="border-b border-black/5 last:border-b-0">
                 <td className="py-3 px-4">
-                  <Link href={`/admin/users/${u.id}`} className="text-emerald-700 hover:underline">
+                  <Link href={`/admin/users/${u.id}`} className="text-[var(--color-primary-dark)] hover:underline">
                     {u.name}
                   </Link>
                 </td>
                 <td className="py-3 px-4">{u.email}</td>
                 <td className="py-3 px-4">
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                      u.role === "ADMIN" ? "bg-black/10 text-black/70" : "bg-emerald-100 text-emerald-700"
-                    }`}
-                  >
-                    {u.role}
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${ROLE_TONE[u.role] ?? ""}`}>
+                    {roleLabel(u.role)}
                   </span>
                 </td>
                 <td className="py-3 px-4">
-                  {u.role === "ADMIN" ? "—" : u.subscriptions[0]?.plan.name ?? "No plan"}
+                  {isStaff(u.role) ? "—" : u.subscriptions[0]?.plan.name ?? "No plan"}
                 </td>
                 <td className="py-3 px-4">{u._count.tags}</td>
                 <td className="py-3 px-4">{u.status}</td>
                 <td className="py-3 px-4">
-                  {u.role === "ADMIN" ? (
+                  {isStaff(u.role) ? (
                     <span className="text-xs text-black/40">Protected</span>
-                  ) : (
+                  ) : canSuspend ? (
                     <UserStatusToggle userId={u.id} status={u.status} />
-                  )}
+                  ) : null}
                 </td>
               </tr>
             ))}

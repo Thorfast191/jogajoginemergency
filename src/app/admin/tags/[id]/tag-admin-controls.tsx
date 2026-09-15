@@ -16,7 +16,15 @@ const ACTIONS: Array<{ next: Status; label: string; hint: string }> = [
   },
 ];
 
-export function TagAdminControls({ tagId, status }: { tagId: string; status: string }) {
+export function TagAdminControls({
+  tagId,
+  status,
+  canDeactivate,
+}: {
+  tagId: string;
+  status: string;
+  canDeactivate: boolean;
+}) {
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -30,10 +38,20 @@ export function TagAdminControls({ tagId, status }: { tagId: string; status: str
     });
   };
 
+  if (status === "DEACTIVATED" && !canDeactivate) {
+    return (
+      <p className="text-sm text-black/60">
+        This QR code was taken down. Only a super admin can reactivate it.
+      </p>
+    );
+  }
+
+  const actions = canDeactivate ? ACTIONS : ACTIONS.filter((a) => a.next !== "DEACTIVATED");
+
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap gap-2">
-        {ACTIONS.map((a) => (
+        {actions.map((a) => (
           <button
             key={a.next}
             onClick={() => run(a.next)}

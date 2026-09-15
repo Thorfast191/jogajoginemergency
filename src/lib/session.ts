@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { isTokenStale } from "@/lib/token-freshness";
+import { isTokenStale, latest } from "@/lib/token-freshness";
+import { can, isStaff, type Permission } from "@/lib/permissions";
 
 // Session JWTs are only checked against `User.status` at sign-in. Without
 // this, an admin suspending a user has no effect until that user's token
@@ -19,34 +20,55 @@ export async function requireActiveUser() {
       role: true,
       status: true,
       passwordChangedAt: true,
+      roleChangedAt: true,
     },
   });
   if (!user || user.status !== "ACTIVE") return null;
 
-  // A password reset can't delete an outstanding JWT, so honour it here
-  // instead: any token minted before the reset stops working immediately.
-  const { passwordChangedAt, ...authed } = user;
-  if (isTokenStale(session.user.authAt, passwordChangedAt)) return null;
+  // A JWT can't be deleted, so revocation is honoured here instead: a token
+  // minted before the last password change or role change stops working
+  // immediately. The role change matters because the token carries the role —
+  // a demoted admin would otherwise keep being routed to the console by the
+  // proxy while the layouts refused them, and bounce between the two.
+  const { passwordChangedAt, roleChangedAt, ...authed } = user;
+  if (isTokenStale(session.user.authAt, latest(passwordChangedAt, roleChangedAt))) return null;
 
   return authed;
 }
 
 export type AuthedUser = NonNullable<Awaited<ReturnType<typeof requireActiveUser>>>;
 
-// --- Admin (platform authority) -------------------------------------------
-// Admin access is role-based and never depends on a customer subscription.
+// --- Staff (platform authority) -------------------------------------------
+// Staff access is role-based and never depends on a customer subscription.
+// What each staff role may do is src/lib/permissions.ts.
 
-/** Returns the active ADMIN, or null. Use in pages/layouts that redirect. */
+/** Returns the active admin of either level, or null. Use in layouts that redirect. */
 export async function getAdmin() {
   const user = await requireActiveUser();
-  return user && user.role === "ADMIN" ? user : null;
+  return user && isStaff(user.role) ? user : null;
 }
 
-/** Returns the active ADMIN, or throws. Use in mutating server actions. */
+/** Returns the active admin of either level, or throws. */
 export async function requireAdmin(): Promise<AuthedUser> {
   const admin = await getAdmin();
   if (!admin) throw new Error("Forbidden: admin access required.");
   return admin;
+}
+
+/**
+ * Returns the active staff member if their role grants `permission`, or null.
+ * Pages use this and render <Forbidden /> on null.
+ */
+export async function getStaffWith(permission: Permission) {
+  const user = await requireActiveUser();
+  return user && can(user.role, permission) ? user : null;
+}
+
+/** Returns the active staff member holding `permission`, or throws. For server actions. */
+export async function requirePermission(permission: Permission): Promise<AuthedUser> {
+  const user = await getStaffWith(permission);
+  if (!user) throw new Error("Forbidden: you don't have permission to do that.");
+  return user;
 }
 
 // --- Customer (subscription-based product user) --------------------------

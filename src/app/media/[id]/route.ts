@@ -35,7 +35,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   let viewer: Viewer = null;
   if (asset.kind === "PROFILE_PHOTO" && !publiclyVisible) {
     const user = await requireActiveUser();
-    if (user) viewer = { id: user.id, role: user.role as "USER" | "ADMIN" };
+    if (user) viewer = { id: user.id, role: user.role };
   }
 
   const access = resolveMediaAccess(

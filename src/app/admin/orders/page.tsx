@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { getAdmin } from "@/lib/session";
+import { getStaffWith } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/money";
+import { Forbidden } from "@/components/admin/forbidden";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +13,7 @@ export default async function AdminOrdersPage({
 }: {
   searchParams: Promise<{ status?: string }>;
 }) {
-  if (!(await getAdmin())) redirect("/dashboard");
+  if (!(await getStaffWith("orders.manage"))) return <Forbidden />;
   const { status } = await searchParams;
   const where = ORDER_STATUSES.includes(status as (typeof ORDER_STATUSES)[number])
     ? { status: status as (typeof ORDER_STATUSES)[number] }

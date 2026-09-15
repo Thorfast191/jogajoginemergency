@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { getAdmin } from "@/lib/session";
+import { getStaffWith } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
+import { can } from "@/lib/permissions";
+import { Forbidden } from "@/components/admin/forbidden";
 
 export const dynamic = "force-dynamic";
 
@@ -11,9 +12,12 @@ function daysAgo(days: number): Date {
 }
 
 export default async function AdminOverviewPage() {
-  if (!(await getAdmin())) redirect("/dashboard");
+  const admin = await getStaffWith("console.view");
+  if (!admin) return <Forbidden />;
+  const seesMoney = can(admin.role, "money.manage");
 
   const weekAgo = daysAgo(7);
+  const now = daysAgo(0);
   const [
     customers,
     suspended,
@@ -28,7 +32,11 @@ export default async function AdminOverviewPage() {
     prisma.user.count({ where: { role: "USER" } }),
     prisma.user.count({ where: { role: "USER", status: "SUSPENDED" } }),
     prisma.tag.count(),
-    prisma.subscription.count({ where: { status: "ACTIVE" } }),
+    // The same rule the scan page uses: a row whose period has lapsed does not
+    // count, whatever its status says.
+    prisma.subscription.count({
+      where: { status: { in: ["ACTIVE", "TRIALING"] }, currentPeriodEnd: { gt: now } },
+    }),
     prisma.abuseReport.count({ where: { status: "OPEN" } }),
     prisma.scanEvent.count(),
     prisma.product.count({ where: { status: "ACTIVE" } }),
@@ -46,7 +54,9 @@ export default async function AdminOverviewPage() {
       stats: [
         { label: "Active products", value: activeProducts, href: "/admin/products" },
         { label: "Orders (7 days)", value: recentOrders, href: "/admin/orders" },
-        { label: "Order revenue (BDT)", value: revenueBdt, href: "/admin/orders" },
+        ...(seesMoney
+          ? [{ label: "Order revenue (BDT)", value: revenueBdt, href: "/admin/payments" }]
+          : []),
       ],
     },
     {

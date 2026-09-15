@@ -1,6 +1,6 @@
-import { redirect } from "next/navigation";
-import { getAdmin } from "@/lib/session";
+import { getStaffWith } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
+import { Forbidden } from "@/components/admin/forbidden";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +9,7 @@ function money(cents: number, currency: string) {
 }
 
 export default async function AdminSubscriptionsPage() {
-  if (!(await getAdmin())) redirect("/dashboard");
+  if (!(await getStaffWith("console.view"))) return <Forbidden />;
 
   const subscriptions = await prisma.subscription.findMany({
     include: {

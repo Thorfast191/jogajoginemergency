@@ -6,6 +6,7 @@ import { signIn } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { loginSchema } from "@/lib/validations";
 import { isSafeNext } from "@/lib/nav";
+import { isStaff } from "@/lib/permissions";
 import { checkLimit, recordHit } from "@/lib/rate-limit";
 import { getClientIp } from "@/lib/client-ip";
 
@@ -63,7 +64,7 @@ export async function loginAction(
     select: { role: true },
   });
 
-  if (user?.role === "ADMIN") {
+  if (isStaff(user?.role)) {
     redirect("/admin");
   }
 

@@ -2,11 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireAdmin } from "@/lib/session";
+import { getStaffWith, requirePermission } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { themeSchema } from "@/lib/validations";
 import { DEFAULT_THEME_SLUG } from "@/lib/theme-access";
 import { processImage, MediaError } from "@/lib/media";
+import { audit } from "@/lib/audit";
 
 export type ThemeState = { error?: string; success?: boolean };
 
@@ -36,7 +37,7 @@ export async function createThemeAction(
   _prev: ThemeState,
   formData: FormData,
 ): Promise<ThemeState> {
-  await requireAdmin();
+  if (!(await getStaffWith("catalog.edit"))) return { error: "Not authorized." };
   const parsed = parse(formData);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
 
@@ -53,7 +54,7 @@ export async function updateThemeAction(
   _prev: ThemeState,
   formData: FormData,
 ): Promise<ThemeState> {
-  await requireAdmin();
+  if (!(await getStaffWith("catalog.edit"))) return { error: "Not authorized." };
   const parsed = parse(formData);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
 
@@ -78,12 +79,13 @@ export async function updateThemeAction(
  * those scan pages with no skin at all.
  */
 export async function archiveThemeAction(id: string): Promise<void> {
-  await requireAdmin();
+  const actor = await requirePermission("destructive");
 
-  const theme = await prisma.theme.findUnique({ where: { id }, select: { slug: true } });
+  const theme = await prisma.theme.findUnique({ where: { id }, select: { slug: true, name: true } });
   if (!theme || theme.slug === DEFAULT_THEME_SLUG) return;
 
   await prisma.theme.update({ where: { id }, data: { status: "ARCHIVED" } });
+  await audit(actor.id, "theme.archive", { type: "theme", id }, `Archived the ${theme.name} theme`);
   revalidate();
 }
 
@@ -98,7 +100,7 @@ export async function uploadThemeArtAction(
   _prev: ThemeState,
   formData: FormData,
 ): Promise<ThemeState> {
-  await requireAdmin();
+  if (!(await getStaffWith("catalog.edit"))) return { error: "Not authorized." };
 
   const file = formData.get("art");
   if (!(file instanceof File) || file.size === 0) return { error: "Choose an image." };

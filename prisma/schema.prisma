@@ -11,9 +11,14 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ADMIN runs the day-to-day console; SUPER_ADMIN additionally holds money,
+// pricing, destructive actions, admin management and platform settings. The
+// table of who may do what is src/lib/permissions.ts, and nothing else reads
+// a role.
 enum Role {
   USER
   ADMIN
+  SUPER_ADMIN
 }
 
 enum UserStatus {
@@ -104,6 +109,7 @@ enum NotificationKind {
   RELAY_MESSAGE
   PASSWORD_RESET
   SUBSCRIPTION_EXPIRING
+  QR_GENERATION_REMINDER
 }
 
 enum NotificationStatus {
@@ -124,6 +130,10 @@ model User {
   // Sessions are JWTs and cannot be deleted server-side. Stamping this on a
   // password reset lets requireActiveUser reject tokens minted before it.
   passwordChangedAt DateTime?
+  // The role lives in the JWT too. Stamping a role change here makes tokens
+  // minted before it stale, the same way a password change does, so a demoted
+  // admin is signed out instead of carrying their old role around.
+  roleChangedAt     DateTime?
   // Whether to email this owner when one of their tags is scanned.
   notifyOnScan      Boolean    @default(true)
   createdAt         DateTime   @default(now())
@@ -138,6 +148,7 @@ model User {
   orders           Order[]
   notifications    NotificationLog[]
   mediaAssets      MediaAsset[]      @relation("MediaOwner")
+  auditEntries     AdminAuditLog[]
 
   @@index([email])
 }
@@ -180,18 +191,21 @@ model VerificationToken {
 }
 
 // --- Plus tier ------------------------------------------------------------
-// Unlocks the portfolio layer, premium themes and full scan history. It never
-// gates emergency information — see src/lib/entitlements.ts.
+// The subscription is what makes a scan page show anything about its owner.
+// Without one the page is dormant and only the anonymous relay stays open —
+// see LAPSED_BEHAVIOUR in src/lib/entitlements.ts.
 
 model SubscriptionPlan {
-  id         String   @id @default(cuid())
-  slug       String   @unique
-  name       String
-  priceCents Int
-  currency   String   @default("BDT")
-  features   String[]
-  isActive   Boolean  @default(true)
-  createdAt  DateTime @default(now())
+  id             String   @id @default(cuid())
+  slug           String   @unique
+  name           String
+  priceCents     Int
+  currency       String   @default("BDT")
+  // How far one payment moves the period end: 1, 6 or 12.
+  intervalMonths Int      @default(12)
+  features       String[]
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
 
   subscriptions Subscription[]
 }
@@ -235,6 +249,10 @@ model Theme {
   accentColor  String @default("#059669")
 
   mascot     String        @default("BLOB")
+  // The artwork leaves an empty square in its centre and the customer's QR is
+  // composited into it. This is that square's side, as a percentage of the
+  // artwork's shorter edge (20–80). See src/lib/sticker-layout.ts.
+  qrBoxSize  Int           @default(40)
   artAssetId String?
   status     ProductStatus @default(ACTIVE)
   sortOrder  Int           @default(0)
@@ -249,22 +267,24 @@ model Theme {
 }
 
 model Product {
-  id           String        @id @default(cuid())
-  slug         String        @unique
-  name         String
-  tagline      String
-  description  String
-  useCase      String?
-  priceCents   Int
-  currency     String        @default("BDT")
+  id             String        @id @default(cuid())
+  slug           String        @unique
+  name           String
+  tagline        String
+  description    String
+  useCase        String?
+  priceCents     Int
+  currency       String        @default("BDT")
   // How many QR codes this purchase entitles the buyer to generate.
-  qrSlots      Int           @default(1)
-  imageAssetId String?
-  themeId      String?
-  status       ProductStatus @default(DRAFT)
-  sortOrder    Int           @default(0)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  qrSlots        Int           @default(1)
+  // Printed width of the sticker, used to lay out the real-size print PDF.
+  stickerWidthMm Int           @default(60)
+  imageAssetId   String?
+  themeId        String?
+  status         ProductStatus @default(DRAFT)
+  sortOrder      Int           @default(0)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   imageAsset MediaAsset? @relation("ProductImage", fields: [imageAssetId], references: [id])
   theme      Theme?      @relation(fields: [themeId], references: [id])
@@ -510,6 +530,41 @@ model NotificationLog {
 
   @@index([status, createdAt])
   @@index([userId])
+}
+
+// Settings a super admin changes from the console. One row, id "default".
+// Secrets never live here — gateway credentials stay in the environment, and
+// `disabledGateways` can only hide a gateway that is already configured.
+model PlatformSetting {
+  id                  String   @id @default("default")
+  supportEmail        String?
+  supportPhone        String?
+  address             String?
+  facebookUrl         String?
+  whatsappUrl         String?
+  announcement        String?
+  ordersPaused        Boolean  @default(false)
+  ordersPausedMessage String?
+  disabledGateways    String[] @default([])
+  updatedAt           DateTime @updatedAt
+}
+
+// Who did what in the console. Written by every money, pricing, destructive
+// and admin-management action, so a super admin can see what other admins
+// changed. `summary` is a sentence for people; the rest is for filtering.
+model AdminAuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  action     String
+  targetType String
+  targetId   String
+  summary    String
+  createdAt  DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([actorId])
 }
 
 // Backing store for the shared rate limiter. Only used when

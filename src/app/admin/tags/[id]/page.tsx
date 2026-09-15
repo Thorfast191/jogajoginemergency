@@ -1,16 +1,19 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
-import { getAdmin } from "@/lib/session";
+import { notFound } from "next/navigation";
+import { getStaffWith } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { tagUrl } from "@/lib/qr";
 import { summarizeUserAgent } from "@/lib/user-agent";
+import { can } from "@/lib/permissions";
+import { Forbidden } from "@/components/admin/forbidden";
 import { TagAdminControls } from "./tag-admin-controls";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminTagDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  if (!(await getAdmin())) redirect("/dashboard");
+  const admin = await getStaffWith("tags.manage");
+  if (!admin) return <Forbidden />;
 
   const tag = await prisma.tag.findUnique({
     where: { id },
@@ -83,7 +86,11 @@ export default async function AdminTagDetailPage({ params }: { params: Promise<{
           <div className="mt-6">
             <h2 className="font-semibold">Status</h2>
             <div className="mt-2">
-              <TagAdminControls tagId={tag.id} status={tag.status} />
+              <TagAdminControls
+                tagId={tag.id}
+                status={tag.status}
+                canDeactivate={can(admin.role, "destructive")}
+              />
             </div>
           </div>
         </div>

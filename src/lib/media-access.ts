@@ -5,6 +5,8 @@
 // (the asset's kind/owner, and whether a profile currently publishes it)
 // and then do exactly what this returns.
 
+import { isStaff } from "./permissions";
+
 export type MediaKind = "PROFILE_PHOTO" | "PRODUCT_IMAGE" | "THEME_ART";
 
 export type MediaAssetRef = {
@@ -12,7 +14,7 @@ export type MediaAssetRef = {
   ownerId: string | null;
 };
 
-export type Viewer = { id: string; role: "USER" | "ADMIN" } | null;
+export type Viewer = { id: string; role: string } | null;
 
 export type MediaAccess =
   | { allowed: false }
@@ -48,7 +50,7 @@ export function resolveMediaAccess(
     return { allowed: true, cacheControl: PRIVATE_SHORT, varyOnCookie: true };
   }
 
-  if (viewer?.role === "ADMIN") {
+  if (viewer && isStaff(viewer.role)) {
     return { allowed: true, cacheControl: PRIVATE_NONE, varyOnCookie: true };
   }
   if (viewer && asset.ownerId && viewer.id === asset.ownerId) {

@@ -1,7 +1,9 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
-import { getAdmin } from "@/lib/session";
+import { notFound } from "next/navigation";
+import { getStaffWith } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
+import { can } from "@/lib/permissions";
+import { Forbidden } from "@/components/admin/forbidden";
 import { ProductForm } from "../product-form";
 import { ProductImageControls } from "./image-controls";
 import { ArchiveButton } from "./archive-button";
@@ -13,7 +15,8 @@ export default async function AdminProductDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  if (!(await getAdmin())) redirect("/dashboard");
+  const admin = await getStaffWith("catalog.edit");
+  if (!admin) return <Forbidden />;
   const { id } = await params;
 
   const [product, themes] = await Promise.all([
@@ -40,6 +43,7 @@ export default async function AdminProductDetailPage({
         <div className="space-y-8">
           <ProductForm
             themes={themes}
+            canPrice={can(admin.role, "pricing.manage")}
             product={{
               id: product.id,
               slug: product.slug,
@@ -50,12 +54,15 @@ export default async function AdminProductDetailPage({
               priceCents: product.priceCents,
               currency: product.currency,
               qrSlots: product.qrSlots,
+              stickerWidthMm: product.stickerWidthMm,
               status: product.status,
               sortOrder: product.sortOrder,
               themeId: product.themeId,
             }}
           />
-          {product.status !== "ARCHIVED" && <ArchiveButton productId={product.id} />}
+          {product.status !== "ARCHIVED" && can(admin.role, "destructive") && (
+            <ArchiveButton productId={product.id} />
+          )}
         </div>
       </div>
     </div>

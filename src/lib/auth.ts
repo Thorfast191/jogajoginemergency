@@ -41,7 +41,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   callbacks: {
     jwt: async ({ token, user }) => {
       if (user) {
-        token.role = (user as { role?: string }).role ?? "USER";
+        token.role = user.role ?? "USER";
         token.id = user.id as string;
         // Sign-in time, seconds since epoch. `requireActiveUser` compares it
         // against User.passwordChangedAt so a password reset immediately
@@ -53,7 +53,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     session: async ({ session, token }) => {
       if (session.user) {
         session.user.id = token.id as string;
-        session.user.role = token.role as "USER" | "ADMIN";
+        session.user.role = token.role as "USER" | "ADMIN" | "SUPER_ADMIN";
         session.user.authAt = token.authAt as number | undefined;
       }
       return session;

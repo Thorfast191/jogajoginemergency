@@ -1,14 +1,16 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { getAdmin } from "@/lib/session";
+import { getStaffWith } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/money";
+import { can } from "@/lib/permissions";
+import { Forbidden } from "@/components/admin/forbidden";
 import { ProductForm } from "./product-form";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminProductsPage() {
-  if (!(await getAdmin())) redirect("/dashboard");
+  const admin = await getStaffWith("catalog.edit");
+  if (!admin) return <Forbidden />;
 
   const products = await prisma.product.findMany({
     orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
@@ -72,10 +74,12 @@ export default async function AdminProductsPage() {
         </table>
       </div>
 
-      <div className="mt-8">
-        <h2 className="font-semibold mb-3">New product</h2>
-        <ProductForm themes={themes} />
-      </div>
+      {can(admin.role, "pricing.manage") && (
+        <div className="mt-8">
+          <h2 className="font-semibold mb-3">New product</h2>
+          <ProductForm themes={themes} />
+        </div>
+      )}
     </div>
   );
 }

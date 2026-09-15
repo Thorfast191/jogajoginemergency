@@ -1,12 +1,12 @@
-import { redirect } from "next/navigation";
-import { getAdmin } from "@/lib/session";
+import { getStaffWith } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
+import { Forbidden } from "@/components/admin/forbidden";
 import { ReportStatusSelect } from "./report-status-select";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminAbuseReportsPage() {
-  if (!(await getAdmin())) redirect("/dashboard");
+  if (!(await getStaffWith("console.view"))) return <Forbidden />;
 
   const reports = await prisma.abuseReport.findMany({
     include: { tag: { select: { shortCode: true } } },

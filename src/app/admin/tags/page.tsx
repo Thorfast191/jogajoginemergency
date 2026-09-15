@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { getAdmin } from "@/lib/session";
+import { getStaffWith } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
+import { can } from "@/lib/permissions";
+import { Forbidden } from "@/components/admin/forbidden";
 import { TagStatusSelect } from "./tag-status-select";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +17,9 @@ export default async function AdminTagsPage({
 }: {
   searchParams: Promise<{ status?: string; product?: string }>;
 }) {
-  if (!(await getAdmin())) redirect("/dashboard");
+  const admin = await getStaffWith("tags.manage");
+  if (!admin) return <Forbidden />;
+  const canDeactivate = can(admin.role, "destructive");
   const sp = await searchParams;
 
   const where: Prisma.TagWhereInput = {};
@@ -125,7 +128,7 @@ export default async function AdminTagsPage({
                   </td>
                   <td className="px-4 py-3 tabular-nums">{t._count.scanEvents}</td>
                   <td className="px-4 py-3">
-                    <TagStatusSelect tagId={t.id} status={t.status} />
+                    <TagStatusSelect tagId={t.id} status={t.status} canDeactivate={canDeactivate} />
                   </td>
                 </tr>
               ))

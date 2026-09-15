@@ -1,8 +1,10 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
-import { getAdmin } from "@/lib/session";
+import { notFound } from "next/navigation";
+import { getStaffWith } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/money";
+import { can } from "@/lib/permissions";
+import { Forbidden } from "@/components/admin/forbidden";
 import { OrderControls, ReplacementButton } from "../order-controls";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +14,8 @@ export default async function AdminOrderDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  if (!(await getAdmin())) redirect("/dashboard");
+  const admin = await getStaffWith("orders.manage");
+  if (!admin) return <Forbidden />;
   const { id } = await params;
 
   const order = await prisma.order.findUnique({
@@ -100,6 +103,7 @@ export default async function AdminOrderDetailPage({
               orderId={order.id}
               status={order.status}
               fulfillmentStatus={order.fulfillmentStatus}
+              canChangeStatus={can(admin.role, "money.manage")}
             />
           </div>
         </div>

@@ -1,15 +1,23 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
-import { getAdmin } from "@/lib/session";
+import { notFound } from "next/navigation";
+import { getStaffWith } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/money";
+import { can, isStaff, roleLabel } from "@/lib/permissions";
+import { Forbidden } from "@/components/admin/forbidden";
 import { UserStatusToggle } from "../status-toggle";
 import { CustomerIdentityForm } from "./identity-form";
 
 export const dynamic = "force-dynamic";
 
+// Kept out of the component body so the render stays free of impure calls.
+function now(): Date {
+  return new Date();
+}
+
 export default async function AdminUserDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  if (!(await getAdmin())) redirect("/dashboard");
+  const admin = await getStaffWith("users.manage");
+  if (!admin) return <Forbidden />;
   const { id } = await params;
 
   const user = await prisma.user.findUnique({
@@ -18,10 +26,14 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
       emergencyProfile: { include: { _count: { select: { contacts: true } } } },
       tags: { include: { product: true }, orderBy: { createdAt: "desc" } },
       orders: { orderBy: { createdAt: "desc" }, include: { _count: { select: { items: true } } } },
-      subscriptions: { where: { status: "ACTIVE" }, include: { plan: true } },
+      subscriptions: {
+        where: { status: { in: ["ACTIVE", "TRIALING"] }, currentPeriodEnd: { gt: now() } },
+        include: { plan: true },
+      },
     },
   });
   if (!user) notFound();
+  const staffAccount = isStaff(user.role);
 
   return (
     <div>
@@ -30,15 +42,15 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
       </Link>
       <h1 className="mt-2 text-2xl font-bold">{user.name}</h1>
       <p className="text-sm text-black/50">
-        {user.email} · {user.role} · {user.status}
+        {user.email} · {roleLabel(user.role)} · {user.status}
       </p>
-      {user.role === "USER" && (
+      {!staffAccount && can(admin.role, "destructive") && (
         <div className="mt-2">
           <UserStatusToggle userId={user.id} status={user.status} />
         </div>
       )}
 
-      {user.role === "USER" ? (
+      {!staffAccount ? (
         <section className="mt-6">
           <h2 className="text-xs font-medium uppercase tracking-wide text-black/40">
             Account details

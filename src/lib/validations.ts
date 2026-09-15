@@ -155,6 +155,12 @@ export const productSchema = z.object({
   // because it is the only thing standing between a purchase and unlimited
   // tags, and a typo here is a hole rather than a cosmetic mistake.
   qrSlots: z.coerce.number().int().min(1).max(100),
+  // Printed width of the sticker; sizes the real-size print PDF.
+  stickerWidthMm: z.coerce
+    .number()
+    .int()
+    .min(20, "Stickers are at least 20 mm wide")
+    .max(300, "Stickers are at most 300 mm wide"),
   themeId: z.string().optional().nullable(),
   status: z.enum(["DRAFT", "ACTIVE", "ARCHIVED"]),
   sortOrder: z.coerce.number().int().min(0).max(9999),

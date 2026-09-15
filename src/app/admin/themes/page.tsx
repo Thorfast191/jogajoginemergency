@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { getStaffWith } from "@/lib/session";
+import { Forbidden } from "@/components/admin/forbidden";
 import { themeCssVars, type ThemeSkin } from "@/lib/themes";
 import { ThemeMascot } from "@/components/illustrations";
 import { ThemeForm } from "./theme-form";
@@ -7,6 +9,8 @@ import { ThemeForm } from "./theme-form";
 export const dynamic = "force-dynamic";
 
 export default async function AdminThemesPage() {
+  if (!(await getStaffWith("catalog.edit"))) return <Forbidden />;
+
   const themes = await prisma.theme.findMany({
     orderBy: [{ status: "asc" }, { sortOrder: "asc" }],
     include: { _count: { select: { products: true, tags: true } } },

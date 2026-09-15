@@ -78,6 +78,11 @@ describe("resolveMediaAccess — private profile photos", () => {
     expect(resolveMediaAccess(profilePhoto, { ...hidden, viewer: admin }).allowed).toBe(true);
   });
 
+  it("allows a super admin", () => {
+    const superAdmin: Viewer = { id: "user_super", role: "SUPER_ADMIN" };
+    expect(resolveMediaAccess(profilePhoto, { ...hidden, viewer: superAdmin }).allowed).toBe(true);
+  });
+
   it("tells caches to store nothing at all", () => {
     const access = resolveMediaAccess(profilePhoto, { ...hidden, viewer: owner });
     expect(access.allowed && access.cacheControl).toBe("private, no-store");

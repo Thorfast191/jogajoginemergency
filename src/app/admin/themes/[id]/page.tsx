@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { getStaffWith } from "@/lib/session";
+import { can } from "@/lib/permissions";
+import { Forbidden } from "@/components/admin/forbidden";
 import { themeCssVars, type ThemeSkin } from "@/lib/themes";
 import { ThemeMascot } from "@/components/illustrations";
 import { ThemeForm } from "../theme-form";
@@ -14,6 +17,8 @@ export default async function AdminThemeDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const admin = await getStaffWith("catalog.edit");
+  if (!admin) return <Forbidden />;
   const { id } = await params;
   const theme = await prisma.theme.findUnique({
     where: { id },
@@ -46,7 +51,7 @@ export default async function AdminThemeDetailPage({
         </div>
       </div>
 
-      {theme.status !== "ARCHIVED" && (
+      {theme.status !== "ARCHIVED" && can(admin.role, "destructive") && (
         <div className="mt-10 max-w-2xl rounded-xl border border-amber-200 bg-amber-50 p-4">
           <p className="text-sm font-semibold text-amber-900">Archive this theme</p>
           <p className="mt-1 text-sm text-amber-800">

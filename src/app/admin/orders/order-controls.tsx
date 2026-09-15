@@ -15,10 +15,13 @@ export function OrderControls({
   orderId,
   status,
   fulfillmentStatus,
+  canChangeStatus,
 }: {
   orderId: string;
   status: string;
   fulfillmentStatus: string;
+  /** Payment status is money — only super admins get the select. */
+  canChangeStatus: boolean;
 }) {
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -37,18 +40,22 @@ export function OrderControls({
     <div className="space-y-3">
       <div>
         <label className="block text-xs font-medium mb-1">Order status</label>
-        <select
-          value={status}
-          disabled={pending}
-          onChange={(e) => run(() => updateOrderStatusAction(orderId, e.target.value))}
-          className="rounded-md border border-black/15 px-2 py-1 text-sm"
-        >
-          {ORDER_STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
+        {canChangeStatus ? (
+          <select
+            value={status}
+            disabled={pending}
+            onChange={(e) => run(() => updateOrderStatusAction(orderId, e.target.value))}
+            className="rounded-md border border-black/15 px-2 py-1 text-sm"
+          >
+            {ORDER_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <p className="text-sm font-semibold">{status}</p>
+        )}
       </div>
       <div>
         <label className="block text-xs font-medium mb-1">Fulfilment</label>

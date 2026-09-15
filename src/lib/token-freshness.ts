@@ -24,3 +24,18 @@ export function isTokenStale(
   const changedAtSeconds = Math.floor(passwordChangedAt.getTime() / 1000);
   return issuedAtSeconds < changedAtSeconds;
 }
+
+/**
+ * The most recent of several revocation stamps, or null if none is set.
+ *
+ * A password change and a role change both have to revoke outstanding tokens:
+ * the JWT carries the role, so a demoted admin would otherwise keep presenting
+ * the old one. Callers pass every stamp and check the token against the latest.
+ */
+export function latest(...dates: (Date | null | undefined)[]): Date | null {
+  let newest: Date | null = null;
+  for (const d of dates) {
+    if (d && (!newest || d.getTime() > newest.getTime())) newest = d;
+  }
+  return newest;
+}
