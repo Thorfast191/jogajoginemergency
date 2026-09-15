@@ -1,8 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { gatewayFor } from "./registry";
 import { amountMatches, nextPaymentStatus, type SettleStatus } from "./core";
-
-const YEAR_MS = 365 * 24 * 60 * 60 * 1000;
+import { extendPeriod } from "@/lib/subscription-periods";
 
 export type SettleOutcome = {
   status: SettleStatus;
@@ -28,7 +27,14 @@ export async function settlePayment(
     where: { id: paymentId },
     include: {
       order: { select: { id: true, orderNumber: true, status: true } },
-      subscription: { select: { id: true, planId: true } },
+      subscription: {
+        select: {
+          id: true,
+          planId: true,
+          currentPeriodEnd: true,
+          plan: { select: { intervalMonths: true } },
+        },
+      },
     },
   });
   if (!payment) return { status: "FAILED", redirectTo: "/dashboard", reason: "Unknown payment." };
@@ -103,9 +109,18 @@ export async function settlePayment(
     }
 
     if (payment.kind === "SUBSCRIPTION" && payment.subscription) {
+      // By the plan's own billing period, and from the current end while it's
+      // still ahead — renewing early never costs the days already paid for.
       await tx.subscription.update({
         where: { id: payment.subscription.id },
-        data: { status: "ACTIVE", currentPeriodEnd: new Date(Date.now() + YEAR_MS) },
+        data: {
+          status: "ACTIVE",
+          currentPeriodEnd: extendPeriod(
+            payment.subscription.currentPeriodEnd,
+            payment.subscription.plan.intervalMonths,
+            new Date(),
+          ),
+        },
       });
     }
   });

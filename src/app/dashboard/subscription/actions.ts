@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireCustomer } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { gatewayFor } from "@/lib/payments/registry";
+import { enabledGatewayFor } from "@/lib/payments/enabled";
 import { appUrl } from "@/lib/payments/config";
 import { warnOnOriginMismatch } from "@/lib/app-origin";
 import { GatewayError } from "@/lib/payments/types";
@@ -29,7 +29,7 @@ export async function subscribeAction(formData: FormData): Promise<void> {
 
   let gateway;
   try {
-    gateway = gatewayFor(providerId);
+    gateway = await enabledGatewayFor(providerId);
   } catch {
     redirect("/dashboard/subscription?payment=unavailable");
   }
@@ -55,7 +55,7 @@ export async function subscribeAction(formData: FormData): Promise<void> {
           status: "CANCELED",
           provider: gateway.id,
           // Set in the past so an unpaid subscription never entitles; the
-          // callback moves it forward a year.
+          // callback moves it forward by the plan's billing period.
           currentPeriodEnd: new Date(0),
         },
         select: { id: true },

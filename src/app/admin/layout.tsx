@@ -31,6 +31,7 @@ const SECTIONS: { heading?: string; links: Entry[] }[] = [
     links: [
       { href: "/admin/users", label: "Users", icon: "users", needs: "users.manage" },
       { href: "/admin/subscriptions", label: "Subscriptions", icon: "card", needs: "console.view" },
+      { href: "/admin/plans", label: "Plans", icon: "receipt", needs: "plans.edit" },
       { href: "/admin/payments", label: "Payments", icon: "wallet", needs: "money.manage" },
     ],
   },
@@ -43,7 +44,11 @@ const SECTIONS: { heading?: string; links: Entry[] }[] = [
   },
   {
     heading: "Platform",
-    links: [{ href: "/admin/admins", label: "Admins", icon: "shield", needs: "admins.manage" }],
+    links: [
+      { href: "/admin/admins", label: "Admins", icon: "shield", needs: "admins.manage" },
+      { href: "/admin/settings", label: "Settings", icon: "settings", needs: "settings.manage" },
+      { href: "/admin/activity", label: "Activity log", icon: "list", needs: "settings.manage" },
+    ],
   },
 ];
 

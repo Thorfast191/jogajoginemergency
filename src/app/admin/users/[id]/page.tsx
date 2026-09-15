@@ -7,6 +7,7 @@ import { can, isStaff, roleLabel } from "@/lib/permissions";
 import { Forbidden } from "@/components/admin/forbidden";
 import { UserStatusToggle } from "../status-toggle";
 import { CustomerIdentityForm } from "./identity-form";
+import { SubscriptionSummary } from "../../subscriptions/subscription-summary";
 
 export const dynamic = "force-dynamic";
 
@@ -84,6 +85,10 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
           <p className="mt-1 font-semibold">{user.subscriptions[0]?.plan.name ?? "None"}</p>
         </div>
       </div>
+
+      {!staffAccount && (
+        <SubscriptionSummary userId={user.id} canManageMoney={can(admin.role, "money.manage")} />
+      )}
 
       <h2 className="mt-8 font-semibold">Tags</h2>
       <ul className="mt-2 divide-y divide-black/10 rounded-lg border border-black/10 text-sm">

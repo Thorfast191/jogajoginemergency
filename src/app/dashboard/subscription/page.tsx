@@ -7,7 +7,8 @@ import { activeSubscriptionStatus } from "@/lib/subscription";
 import { PageHeader, Badge, Card } from "@/components/ui";
 import { MascotCheer, MascotThink } from "@/components/illustrations";
 import { subscribeAction, cancelSubscriptionAction } from "./actions";
-import { availableGateways } from "@/lib/payments/registry";
+import { enabledGateways } from "@/lib/payments/enabled";
+import { intervalLabel } from "@/lib/subscription-periods";
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +45,7 @@ export default async function SubscriptionPage() {
   ]);
 
   const entitled = status !== null;
-  const methods = availableGateways().map((g) => ({ id: g.id, label: g.label }));
+  const methods = (await enabledGateways()).map((g) => ({ id: g.id, label: g.label }));
 
   return (
     <div>
@@ -67,7 +68,9 @@ export default async function SubscriptionPage() {
             </p>
             {subscription && entitled ? (
               <p className="mt-1 text-sm text-black/60">
-                {subscription.plan.name} · renews {subscription.currentPeriodEnd.toLocaleDateString()}
+                {subscription.plan.name}
+                {status === "TRIALING" ? " (complimentary)" : ""} · runs until{" "}
+                {subscription.currentPeriodEnd.toLocaleDateString()}
               </p>
             ) : (
               <p className="mt-1 text-sm text-black/60">
@@ -134,7 +137,10 @@ If it lapses, your page goes quiet but the relay stays open, so a lost item can
                   <p className="font-bold">{plan.name}</p>
                   <p className="mt-1 text-2xl font-bold">
                     {formatPrice(plan.priceCents, plan.currency)}
-                    <span className="text-sm font-normal text-black/40"> / year</span>
+                    <span className="text-sm font-normal text-black/40">
+                      {" "}
+                      / {intervalLabel(plan.intervalMonths)}
+                    </span>
                   </p>
                   {plan.features.length > 0 && (
                     <ul className="mt-3 space-y-1 text-sm text-black/60">

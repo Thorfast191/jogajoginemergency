@@ -3,6 +3,7 @@ import { SiteNav } from "@/components/site-nav";
 import { SiteFooter } from "@/components/site-footer";
 import { readCart, resolveCart } from "@/lib/cart-server";
 import { formatPrice } from "@/lib/money";
+import { getSettings } from "@/lib/settings";
 import { EmptyState, PageHeader } from "@/components/ui";
 import { EmptyCart } from "@/components/illustrations";
 import { updateCartQtyAction, removeFromCartAction } from "./actions";
@@ -10,13 +11,20 @@ import { updateCartQtyAction, removeFromCartAction } from "./actions";
 export const dynamic = "force-dynamic";
 
 export default async function CartPage() {
-  const cart = await resolveCart(await readCart());
+  const [cart, settings] = await Promise.all([resolveCart(await readCart()), getSettings()]);
 
   return (
     <div className="flex flex-col min-h-screen">
       <SiteNav />
       <main className="flex-1 mx-auto w-full max-w-3xl px-4 py-12">
         <PageHeader title="Your cart" subtitle="Stickers are a one-time purchase." />
+
+        {settings.ordersPaused && (
+          <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            {settings.ordersPausedMessage ??
+              "The shop isn't taking new orders right now. Your cart is saved — please check back soon."}
+          </p>
+        )}
 
         {cart.dropped.length > 0 && (
           <p className="mt-4 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-900">
@@ -92,12 +100,18 @@ export default async function CartPage() {
                 <p className="text-sm text-black/50">Total</p>
                 <p className="text-2xl font-bold">{formatPrice(cart.totalCents, cart.currency)}</p>
               </div>
-              <Link
-                href="/checkout"
-                className="rounded-xl bg-[var(--color-primary)] px-6 py-3 font-semibold text-white transition-transform hover:scale-[1.02] active:scale-[0.99]"
-              >
-                Checkout
-              </Link>
+              {settings.ordersPaused ? (
+                <span className="rounded-xl bg-black/10 px-6 py-3 font-semibold text-black/40">
+                  Checkout paused
+                </span>
+              ) : (
+                <Link
+                  href="/checkout"
+                  className="rounded-xl bg-[var(--color-primary)] px-6 py-3 font-semibold text-white transition-transform hover:scale-[1.02] active:scale-[0.99]"
+                >
+                  Checkout
+                </Link>
+              )}
             </div>
           </>
         )}

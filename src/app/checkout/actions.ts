@@ -7,7 +7,8 @@ import { prisma } from "@/lib/prisma";
 import { checkoutSchema } from "@/lib/validations";
 import { generateOrderNumber } from "@/lib/order";
 import { readCart, resolveCart } from "@/lib/cart-server";
-import { gatewayFor } from "@/lib/payments/registry";
+import { enabledGatewayFor } from "@/lib/payments/enabled";
+import { getSettings } from "@/lib/settings";
 import { appUrl } from "@/lib/payments/config";
 import { warnOnOriginMismatch } from "@/lib/app-origin";
 import { GatewayError } from "@/lib/payments/types";
@@ -45,6 +46,13 @@ export async function createOrderAction(
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
 
+  // A super admin can pause new orders (out of stock, a holiday). Checked here
+  // and not just hidden in the UI, so an open checkout tab can't slip one in.
+  const settings = await getSettings();
+  if (settings.ordersPaused) {
+    return { error: settings.ordersPausedMessage ?? "The shop isn't taking new orders right now." };
+  }
+
   // Prices come from the database via resolveCart, never from the form or the
   // cookie: the cart carries slugs and quantities and nothing else.
   const cart = await resolveCart(await readCart());
@@ -52,7 +60,7 @@ export async function createOrderAction(
 
   let gateway;
   try {
-    gateway = gatewayFor(parsed.data.provider);
+    gateway = await enabledGatewayFor(parsed.data.provider);
   } catch {
     return { error: "That payment method isn't available." };
   }

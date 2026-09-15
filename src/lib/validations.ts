@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { MASCOTS } from "@/lib/themes";
+import { BILLING_INTERVALS } from "@/lib/subscription-periods";
 
 // --- Auth --------------------------------------------------------------
 
@@ -196,6 +197,87 @@ export const themeSchema = z.object({
     .max(80, "The QR square can be at most 80% of the artwork"),
   status: z.enum(["DRAFT", "ACTIVE", "ARCHIVED"]),
   sortOrder: z.coerce.number().int().min(0).max(9999),
+});
+
+// --- Admin: subscription plans ------------------------------------
+
+/** One feature per line of a textarea, trimmed, blank lines dropped. */
+export function parseFeatures(text: string): string[] {
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+const featuresField = z.preprocess(
+  (v) => (typeof v === "string" ? parseFeatures(v) : v),
+  z.array(z.string().min(1).max(120)).max(8, "A plan can list at most 8 features"),
+);
+
+// A browser leaves an unticked checkbox out of the form, and sends "on" for a
+// ticked one.
+const checkbox = z.preprocess((v) => v === "on" || v === "true" || v === true, z.boolean());
+
+/** What any admin may change about a plan: its words. */
+export const planTextSchema = z.object({
+  name: z.string().trim().min(2).max(60),
+  features: featuresField,
+});
+
+/** The whole plan, for a super admin: its words, its price and its billing period. */
+export const planSchema = z.object({
+  slug: z
+    .string()
+    .min(2)
+    .max(40)
+    .regex(/^[a-z0-9-]+$/, "Lowercase letters, digits and hyphens only"),
+  name: z.string().trim().min(2).max(60),
+  priceCents: z.coerce.number().int().min(0, "A price can't be negative"),
+  intervalMonths: z.coerce
+    .number()
+    .int()
+    .refine((n) => (BILLING_INTERVALS as readonly number[]).includes(n), {
+      message: "Billing is monthly, every 6 months, or yearly",
+    }),
+  features: featuresField,
+  isActive: checkbox,
+});
+
+// --- Admin: platform settings -------------------------------------
+
+const blankToNull = (v: unknown) => (typeof v === "string" && v.trim() === "" ? null : v);
+
+const optionalText = (max: number) =>
+  z.preprocess(blankToNull, z.string().trim().max(max).nullable());
+
+const optionalHttpUrl = z.preprocess(
+  blankToNull,
+  z
+    .string()
+    .trim()
+    .max(300)
+    .refine(
+      (v) => {
+        try {
+          return ["http:", "https:"].includes(new URL(v).protocol);
+        } catch {
+          return false;
+        }
+      },
+      { message: "Enter a full http:// or https:// address" },
+    )
+    .nullable(),
+);
+
+export const settingsSchema = z.object({
+  supportEmail: z.preprocess(blankToNull, z.email("Enter a valid support email").nullable()),
+  supportPhone: optionalText(40),
+  address: optionalText(200),
+  facebookUrl: optionalHttpUrl,
+  whatsappUrl: optionalHttpUrl,
+  announcement: optionalText(200),
+  ordersPaused: checkbox,
+  ordersPausedMessage: optionalText(200),
 });
 
 export const orderStatusSchema = z.object({
