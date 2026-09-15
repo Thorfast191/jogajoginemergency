@@ -64,7 +64,10 @@ An audit of the running product against how it is meant to work found:
 - **Bug fixed:** the JWT carries the role. A demoted admin's token still said
   ADMIN, so the proxy and the layouts redirected each other forever. Any role
   change now stamps `User.roleChangedAt`, and `isTokenStale` rejects tokens
-  minted before the later of `passwordChangedAt` and `roleChangedAt`.
+  minted before the later of `passwordChangedAt` and `roleChangedAt`. The proxy
+  no longer routes by the token's role at all — it only sends people without a
+  session to log in — and the layouts pick the area from the database, sending
+  a revoked session to `/login`.
 
 ## 2. Themed stickers
 
@@ -89,10 +92,10 @@ Data:
 Routes:
 - `GET /api/tags/[id]/sticker?format=png|pdf&size=thumb` — owner or staff with
   `tags.manage`. `private, no-store`: the image carries the short code.
-- `GET /api/orders/[id]/stickers.pdf` — staff with `orders.manage`; every
-  non-deactivated tag on the order, one page each.
-- `GET /api/themes/[id]/preview.png` — public; the QR encodes `/demo?theme=slug`,
-  never a real profile.
+- `GET /api/orders/[id]/stickers` — staff with `orders.manage`; every
+  non-deactivated tag on the order, one page each (PDF).
+- `GET /api/themes/[id]/preview` — public for live themes (PNG); the QR encodes
+  `/demo?theme=slug`, never a real profile.
 - `GET /api/tags/[id]/qr` — unchanged for owners, now also open to staff.
 
 UI:

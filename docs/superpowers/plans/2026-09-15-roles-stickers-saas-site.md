@@ -179,7 +179,7 @@ export async function stickerPdf(stickers: RenderedSticker[], widthMm: number): 
 
 ### Task 6: Print readiness, routes and admin editors
 
-**Files:** Create `src/lib/print.ts`, `src/lib/__tests__/print.test.ts`, `src/lib/sticker-server.ts`, `src/app/api/tags/[id]/sticker/route.ts`, `src/app/api/orders/[id]/stickers.pdf/route.ts`, `src/app/api/themes/[id]/preview.png/route.ts`, `src/app/admin/themes/[id]/qr-box-editor.tsx`; modify `src/app/api/tags/[id]/qr/route.ts`, `src/lib/media.ts`, `src/app/admin/themes/actions.ts`, `src/app/admin/themes/theme-form.tsx`, `src/app/admin/themes/[id]/art-upload.tsx`, `src/app/admin/products/product-form.tsx`, `src/app/admin/products/actions.ts`, `src/lib/validations.ts`.
+**Files:** Create `src/lib/print.ts`, `src/lib/__tests__/print.test.ts`, `src/lib/sticker-server.ts`, `src/app/api/tags/[id]/sticker/route.ts`, `src/app/api/orders/[id]/stickers/route.ts`, `src/app/api/themes/[id]/preview/route.ts` (no file extensions in route segments), `src/app/admin/themes/[id]/qr-box-editor.tsx`; modify `src/app/api/tags/[id]/qr/route.ts`, `src/lib/media.ts`, `src/app/admin/themes/actions.ts`, `src/app/admin/themes/theme-form.tsx`, `src/app/admin/themes/[id]/art-upload.tsx`, `src/app/admin/products/product-form.tsx`, `src/app/admin/products/actions.ts`, `src/lib/validations.ts`.
 
 **Interfaces — Produces:**
 ```ts
