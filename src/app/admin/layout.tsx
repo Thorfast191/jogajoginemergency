@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getAdmin } from "@/lib/session";
-import { can, roleLabel, type Permission } from "@/lib/permissions";
+import { requireActiveUser } from "@/lib/session";
+import { can, isStaff, roleLabel, type Permission } from "@/lib/permissions";
 import { signOutAction } from "@/app/auth-actions";
 import { SideNav, type SideNavSection } from "@/components/side-nav";
 import { Icon, type IconName } from "@/components/icons";
@@ -53,8 +53,12 @@ const SECTIONS: { heading?: string; links: Entry[] }[] = [
 ];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const admin = await getAdmin();
-  if (!admin) redirect("/dashboard");
+  // No valid session (signed out, suspended, or a token revoked by a password
+  // or role change) goes to log in; a signed-in customer goes to their own
+  // area. Both decided from the database, not from the token.
+  const admin = await requireActiveUser();
+  if (!admin) redirect("/login?next=/admin");
+  if (!isStaff(admin.role)) redirect("/dashboard");
 
   const sections: SideNavSection[] = SECTIONS.map((s) => ({
     heading: s.heading,
