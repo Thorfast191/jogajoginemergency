@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { useKeptForm } from "@/lib/use-kept-form";
 import { updateCustomerIdentityAction, type AdminActionState } from "@/app/admin/actions";
 
 const initial: AdminActionState = {};
@@ -18,9 +19,10 @@ export function CustomerIdentityForm({
 }) {
   const action = updateCustomerIdentityAction.bind(null, userId);
   const [state, formAction, pending] = useActionState<AdminActionState, FormData>(action, initial);
+  const [formRef, submitForm] = useKeptForm(formAction, state);
 
   return (
-    <form action={formAction} className="max-w-md space-y-3">
+    <form ref={formRef} action={formAction} onSubmit={submitForm} className="max-w-md space-y-3">
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="text-sm">
           Name

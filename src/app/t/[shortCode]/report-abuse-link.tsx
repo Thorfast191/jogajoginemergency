@@ -6,6 +6,7 @@ export function ReportAbuseLink({ shortCode }: { shortCode: string }) {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "sent">("idle");
+  const [error, setError] = useState<string | null>(null);
 
   if (!open) {
     return (
@@ -24,12 +25,25 @@ export function ReportAbuseLink({ shortCode }: { shortCode: string }) {
       onSubmit={async (e) => {
         e.preventDefault();
         setStatus("sending");
-        await fetch("/api/abuse-reports", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ shortCode, reason }),
-        });
-        setStatus("sent");
+        setError(null);
+        // Only a report the server accepted is thanked for: a refused or lost
+        // one said "we'll review this" about something nobody would see.
+        try {
+          const res = await fetch("/api/abuse-reports", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ shortCode, reason }),
+          });
+          if (res.ok) {
+            setStatus("sent");
+            return;
+          }
+          const data = await res.json().catch(() => ({}));
+          setError(data.error ?? "The report couldn't be sent. Please try again.");
+        } catch {
+          setError("Couldn't send — check your connection and try again.");
+        }
+        setStatus("idle");
       }}
       className="flex flex-col items-center gap-2"
     >
@@ -52,6 +66,11 @@ export function ReportAbuseLink({ shortCode }: { shortCode: string }) {
       >
         {status === "sending" ? "Sending…" : "Submit report"}
       </button>
+      {error && (
+        <p role="alert" className="text-xs text-red-600">
+          {error}
+        </p>
+      )}
     </form>
   );
 }

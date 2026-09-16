@@ -1,6 +1,8 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
+import { useKeptForm } from "@/lib/use-kept-form";
+import { MAX_IMAGE_BYTES, blockOversizeSubmit } from "@/lib/upload-limits";
 import { createProductAction, updateProductAction, type ProductState } from "./actions";
 
 const initial: ProductState = {};
@@ -38,11 +40,21 @@ export function ProductForm({
 }) {
   const action = product ? updateProductAction.bind(null, product.id) : createProductAction;
   const [state, formAction, pending] = useActionState<ProductState, FormData>(action, initial);
+  const [tooBig, setTooBig] = useState<string | null>(null);
+  const [formRef, submitForm] = useKeptForm(formAction, state);
 
   const field = "mt-1 w-full rounded-lg border border-black/15 bg-white px-3 py-2 text-sm";
 
   return (
-    <form action={formAction} className="space-y-3 max-w-xl">
+    <form
+      ref={formRef}
+      action={formAction}
+      onSubmit={(e) => {
+        setTooBig(blockOversizeSubmit(e, MAX_IMAGE_BYTES));
+        submitForm(e);
+      }}
+      className="space-y-3 max-w-xl"
+    >
       <div className="grid sm:grid-cols-2 gap-3">
         <label className="text-sm">
           Slug
@@ -183,8 +195,8 @@ export function ProductForm({
         </label>
       )}
 
-      {state.error && <p className="text-sm text-red-600">{state.error}</p>}
-      {state.success && <p className="text-sm text-[var(--color-primary-dark)]">Saved.</p>}
+      {(tooBig ?? state.error) && <p className="text-sm text-red-600">{tooBig ?? state.error}</p>}
+      {!tooBig && state.success && <p className="text-sm text-[var(--color-primary-dark)]">Saved.</p>}
 
       <button
         type="submit"

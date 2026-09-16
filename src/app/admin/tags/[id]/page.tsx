@@ -89,6 +89,7 @@ export default async function AdminTagDetailPage({ params }: { params: Promise<{
               <TagAdminControls
                 tagId={tag.id}
                 status={tag.status}
+                takenDown={tag.takenDownAt !== null}
                 canDeactivate={can(admin.role, "destructive")}
               />
             </div>

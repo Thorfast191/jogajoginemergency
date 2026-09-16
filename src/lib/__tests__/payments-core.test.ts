@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { toCents, amountMatches, nextPaymentStatus } from "../payments/core";
+import { toCents, amountMatches, nextPaymentStatus, paymentCoversOrder } from "../payments/core";
 
 describe("toCents — gateways report decimal strings, we store integers", () => {
   it("parses whole and fractional amounts", () => {
@@ -58,6 +58,32 @@ describe("amountMatches — the gateway's figure must equal the order", () => {
 
   it("rejects an unreadable amount", () => {
     expect(amountMatches(29900, "lots", "BDT", "BDT")).toBe(false);
+  });
+});
+
+describe("paymentCoversOrder — a payment only settles the order it was for", () => {
+  const order = { totalCents: 149500, currency: "BDT" };
+
+  it("accepts a payment for the whole order", () => {
+    expect(paymentCoversOrder({ amountCents: 149500, currency: "BDT" }, order)).toBe(true);
+  });
+
+  it("rejects a payment for less than the order", () => {
+    // A retried checkout once billed the (smaller) current cart against the
+    // original order, so one sticker's price paid for five.
+    expect(paymentCoversOrder({ amountCents: 29900, currency: "BDT" }, order)).toBe(false);
+  });
+
+  it("rejects a payment for more than the order", () => {
+    expect(paymentCoversOrder({ amountCents: 299000, currency: "BDT" }, order)).toBe(false);
+  });
+
+  it("rejects a payment in another currency", () => {
+    expect(paymentCoversOrder({ amountCents: 149500, currency: "USD" }, order)).toBe(false);
+  });
+
+  it("is case-insensitive about the currency code", () => {
+    expect(paymentCoversOrder({ amountCents: 149500, currency: "bdt" }, order)).toBe(true);
   });
 });
 

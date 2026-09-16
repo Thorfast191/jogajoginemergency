@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { relayMessageSchema } from "@/lib/validations";
+import { relayMessageSchema, firstIssue } from "@/lib/validations";
 import { getClientIp } from "@/lib/client-ip";
 import { rateLimit } from "@/lib/rate-limit";
 import { notifyOwnerOfRelayMessage } from "@/lib/notify";
@@ -33,7 +33,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ shortCo
   const body = await req.json().catch(() => null);
   const parsed = relayMessageSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid input" }, { status: 400 });
+    return NextResponse.json({ error: firstIssue(parsed.error) }, { status: 400 });
   }
 
   await prisma.relayMessage.create({

@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { useKeptForm } from "@/lib/use-kept-form";
 import { updateEmergencyProfileAction, type ProfileState } from "./actions";
 
 const initialState: ProfileState = {};
@@ -19,10 +20,11 @@ type Profile = {
 
 export function ProfileForm({ profile, accountName }: { profile: Profile; accountName: string }) {
   const [state, formAction, pending] = useActionState(updateEmergencyProfileAction, initialState);
+  const [formRef, submitForm] = useKeptForm(formAction, state);
   const [contactMode, setContactMode] = useState(profile.contactMode);
 
   return (
-    <form action={formAction} className="space-y-5 max-w-lg">
+    <form ref={formRef} action={formAction} onSubmit={submitForm} className="space-y-5 max-w-lg">
       <div>
         <label className="block text-sm font-medium mb-1" htmlFor="displayName">
           Display name

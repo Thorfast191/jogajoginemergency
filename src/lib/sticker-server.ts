@@ -23,9 +23,11 @@ const themeSelect = {
   accentColor: true,
   qrBoxSize: true,
   artAssetId: true,
+  updatedAt: true,
+  id: true,
 } as const;
 
-type ThemeRow = StickerTheme & { artAssetId: string | null };
+type ThemeRow = StickerTheme & { id?: string; artAssetId: string | null; updatedAt: Date };
 
 export type TagSticker = {
   id: string;
@@ -34,6 +36,12 @@ export type TagSticker = {
   status: string;
   widthMm: number;
   theme: ThemeRow;
+  /**
+   * Changes whenever the tag's theme changes or is edited, so a cached sticker
+   * revalidates. The id matters: seeded themes can share an updatedAt to the
+   * millisecond, and switching between two of them must not look unchanged.
+   */
+  themeVersion: string;
 };
 
 async function artBytes(assetId: string | null): Promise<Buffer | null> {
@@ -50,7 +58,7 @@ async function resolveTheme(theme: ThemeRow | null): Promise<ThemeRow> {
   if (theme) return theme;
   const row = await defaultTheme();
   if (row) return row;
-  return { ...DEFAULT_THEME, qrBoxSize: QR_BOX_DEFAULT, artAssetId: null };
+  return { ...DEFAULT_THEME, qrBoxSize: QR_BOX_DEFAULT, artAssetId: null, updatedAt: new Date(0) };
 }
 
 /** Everything needed to authorize and render a tag's sticker, or null. */
@@ -68,13 +76,15 @@ export async function loadTagSticker(tagId: string): Promise<TagSticker | null> 
   });
   if (!tag) return null;
 
+  const theme = await resolveTheme(tag.theme);
   return {
     id: tag.id,
     shortCode: tag.shortCode,
     userId: tag.userId,
     status: tag.status,
     widthMm: tag.product?.stickerWidthMm ?? DEFAULT_WIDTH_MM,
-    theme: await resolveTheme(tag.theme),
+    theme,
+    themeVersion: `${theme.id ?? "built-in"}-${theme.updatedAt.getTime()}`,
   };
 }
 
@@ -92,23 +102,32 @@ export async function renderTagSticker(
   return { ...sticker, widthMm: tag.widthMm };
 }
 
+export type ThemePreview = ThemeRow & { id: string; slug: string; status: string; updatedAt: Date };
+
+/**
+ * What a theme preview needs, without rendering anything.
+ *
+ * Split from the render for the same reason as tags: the route has to know
+ * whose theme this is and whether the caller may see it *before* spending a
+ * decode, a resize and a composite on them.
+ */
+export async function loadThemePreview(themeId: string): Promise<ThemePreview | null> {
+  return prisma.theme.findUnique({
+    where: { id: themeId },
+    select: { ...themeSelect, id: true, slug: true, status: true, updatedAt: true },
+  });
+}
+
 /**
  * A theme's artwork with a sample QR in the square, for the storefront and the
  * admin editor. The sample points at the demo scan page, never at anyone's
  * real profile.
  */
-export async function renderThemePreview(themeId: string) {
-  const theme = await prisma.theme.findUnique({
-    where: { id: themeId },
-    select: { ...themeSelect, slug: true, status: true, updatedAt: true },
-  });
-  if (!theme) return null;
-
-  const sticker = await renderSticker({
+export async function renderThemePreview(theme: ThemePreview): Promise<RenderedSticker> {
+  return renderSticker({
     art: await artBytes(theme.artAssetId),
     theme,
     url: `${appUrl()}/demo?theme=${encodeURIComponent(theme.slug)}`,
     maxEdge: PREVIEW_EDGE,
   });
-  return { ...sticker, status: theme.status, updatedAt: theme.updatedAt };
 }

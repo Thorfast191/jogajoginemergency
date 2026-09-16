@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import sharp, { type Sharp, type Metadata } from "sharp";
+import { MAX_IMAGE_BYTES, MAX_THEME_ART_BYTES } from "@/lib/upload-limits";
 
 export type MediaKind = "PROFILE_PHOTO" | "PRODUCT_IMAGE";
 
@@ -12,14 +13,14 @@ export type ProcessedImage = {
   checksum: string;
 };
 
-const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+const MAX_UPLOAD_BYTES = MAX_IMAGE_BYTES;
 const ACCEPTED_FORMATS = new Set(["jpeg", "png", "webp"]);
 const MAX_EDGE: Record<MediaKind, number> = { PROFILE_PHOTO: 512, PRODUCT_IMAGE: 1024 };
 
 // Theme artwork is printed, not just shown on a screen, and a customer's QR is
 // composited into it. It is kept large and lossless so a 60–100 mm sticker
 // prints sharp; everything else is sized for the web.
-export const MAX_THEME_ART_BYTES = 10 * 1024 * 1024;
+export { MAX_THEME_ART_BYTES };
 const THEME_ART_EDGE = 3000;
 
 /** Thrown for a rejected upload; message is safe to show a user. */

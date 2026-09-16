@@ -6,6 +6,7 @@ import { slotBalanceForUser } from "@/lib/slots-server";
 import { userIsEntitled } from "@/lib/subscription";
 import { Icon, type IconName } from "@/components/icons";
 import { MascotCheer } from "@/components/illustrations";
+import { PaymentNotice } from "@/components/payment-notice";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,11 @@ function tagLabel(t: { internalLabel: string | null; shortCode: string }) {
 
 type Step = { title: string; body: string; done: boolean; href: string; cta: string };
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ payment?: string | string[] }>;
+}) {
   const user = await getCustomer();
   if (!user) redirect("/login");
   const userId = user.id;
@@ -90,6 +95,10 @@ export default async function DashboardPage() {
     <div>
       <h1 className="text-2xl font-bold sm:text-3xl">Welcome back{user.name ? `, ${user.name.split(" ")[0]}` : ""}</h1>
       <p className="mt-1 text-sm text-black/50">Here&apos;s how your stickers and page are doing.</p>
+
+      <div className="mt-5 empty:hidden">
+        <PaymentNotice code={(await searchParams).payment} />
+      </div>
 
       {balance.available > 0 && (
         <Link

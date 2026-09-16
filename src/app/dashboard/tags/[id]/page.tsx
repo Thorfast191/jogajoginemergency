@@ -155,7 +155,12 @@ export default async function TagDetailPage({ params }: { params: Promise<{ id: 
         <div>
           <h2 className="font-semibold mb-3">Settings</h2>
           <TagSettingsForm
-            tag={{ id: tag.id, internalLabel: tag.internalLabel, status: tag.status }}
+            tag={{
+              id: tag.id,
+              internalLabel: tag.internalLabel,
+              status: tag.status,
+              takenDown: tag.takenDownAt !== null,
+            }}
           />
 
           <div className="mt-8">

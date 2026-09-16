@@ -32,7 +32,10 @@ export function PublicProfileCard({
   view: PublicProfileView;
   shortCode: string;
   mascot?: string;
-  /** Sample data: no working relay, no dialable numbers. */
+  /**
+   * Sample data, or the owner's own preview: no working relay, no dialable
+   * numbers. A live form there would post to a code that doesn't exist.
+   */
   demo?: boolean;
 }) {
   const relay = demo ? <DemoRelay /> : <RelayForm shortCode={shortCode} />;

@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { gatewayFor } from "./registry";
-import { amountMatches, nextPaymentStatus, type SettleStatus } from "./core";
+import { amountMatches, nextPaymentStatus, paymentCoversOrder, type SettleStatus } from "./core";
 import { extendPeriod } from "@/lib/subscription-periods";
 
 export type SettleOutcome = {
@@ -26,7 +26,7 @@ export async function settlePayment(
   const payment = await prisma.payment.findUnique({
     where: { id: paymentId },
     include: {
-      order: { select: { id: true, orderNumber: true, status: true } },
+      order: { select: { id: true, orderNumber: true, status: true, totalCents: true, currency: true } },
       subscription: {
         select: {
           id: true,
@@ -37,14 +37,22 @@ export async function settlePayment(
       },
     },
   });
-  if (!payment) return { status: "FAILED", redirectTo: "/dashboard", reason: "Unknown payment." };
+  // A reference we don't recognise: tell the customer something went wrong
+  // rather than dropping them on the dashboard with no explanation.
+  if (!payment) {
+    return { status: "FAILED", redirectTo: "/dashboard?payment=unknown", reason: "Unknown payment." };
+  }
 
   const done =
     payment.kind === "ORDER"
       ? `/checkout/success?order=${payment.order?.orderNumber ?? ""}`
       : "/dashboard/subscription";
-  const failed =
-    payment.kind === "ORDER" ? "/checkout?payment=failed" : "/dashboard/subscription?payment=failed";
+  const failedFor = (outcome: SettleStatus) => {
+    const code = outcome === "CANCELLED" ? "cancelled" : "failed";
+    return payment.kind === "ORDER"
+      ? `/checkout?payment=${code}`
+      : `/dashboard/subscription?payment=${code}`;
+  };
 
   // Already settled successfully — a duplicate callback. Nothing to do but
   // send the customer where they were going.
@@ -74,9 +82,20 @@ export async function settlePayment(
     );
   }
 
+  // And is this payment for the whole order? Checked against the order, not
+  // just the payment row, so no way of creating a payment can settle an order
+  // for less than it costs.
+  if (status === "SUCCEEDED" && payment.kind === "ORDER" && payment.order && !paymentCoversOrder(payment, payment.order)) {
+    status = "FAILED";
+    reason = "Paid amount did not match the order.";
+    console.error(
+      `[payments] payment ${payment.id} (${payment.amountCents} ${payment.currency}) does not cover order ${payment.order.orderNumber} (${payment.order.totalCents} ${payment.order.currency})`,
+    );
+  }
+
   const next = nextPaymentStatus(payment.status as SettleStatus, status);
   if (!next) {
-    return { status: payment.status as SettleStatus, redirectTo: status === "SUCCEEDED" ? done : failed, reason };
+    return { status: payment.status as SettleStatus, redirectTo: status === "SUCCEEDED" ? done : failedFor(status), reason };
   }
 
   await prisma.$transaction(async (tx) => {
@@ -127,7 +146,7 @@ export async function settlePayment(
 
   return {
     status: next,
-    redirectTo: next === "SUCCEEDED" ? done : failed,
+    redirectTo: next === "SUCCEEDED" ? done : failedFor(next),
     reason,
     fulfilledOrderId:
       next === "SUCCEEDED" && payment.kind === "ORDER" ? payment.order?.id : undefined,

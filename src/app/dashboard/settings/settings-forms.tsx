@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { useKeptForm } from "@/lib/use-kept-form";
 import {
   updateProfileAction,
   updatePasswordAction,
@@ -13,9 +14,10 @@ export function ProfileForm({ name, phone }: { name: string; phone: string }) {
     updateProfileAction,
     {}
   );
+  const [formRef, submitForm] = useKeptForm(formAction, state);
 
   return (
-    <form action={formAction} className="space-y-3 max-w-sm">
+    <form ref={formRef} action={formAction} onSubmit={submitForm} className="space-y-3 max-w-sm">
       <div>
         <label className="block text-sm font-medium mb-1" htmlFor="name">
           Name
@@ -57,9 +59,10 @@ export function PasswordForm() {
     updatePasswordAction,
     {}
   );
+  const [formRef, submitForm] = useKeptForm(formAction, state, true);
 
   return (
-    <form action={formAction} className="space-y-3 max-w-sm">
+    <form ref={formRef} action={formAction} onSubmit={submitForm} className="space-y-3 max-w-sm">
       <div>
         <label className="block text-sm font-medium mb-1" htmlFor="currentPassword">
           Current password

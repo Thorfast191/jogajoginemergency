@@ -88,3 +88,16 @@ export async function resolveCart(lines: CartLine[]): Promise<ResolvedCart> {
     dropped,
   };
 }
+
+/**
+ * The cookie's lines that can still be bought — an archived, drafted or
+ * unknown product is left out.
+ *
+ * The cookie itself keeps whatever it was given until it is next written, so
+ * anything that counts or changes the cart starts from this: the header badge
+ * said "Cart 1" over an empty cart once the only product in it was archived.
+ */
+export async function readLiveCart(): Promise<CartLine[]> {
+  const { lines } = await resolveCart(await readCart());
+  return lines.map(({ slug, qty }) => ({ slug, qty }));
+}

@@ -1,6 +1,8 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
+import { useKeptForm } from "@/lib/use-kept-form";
+import { MAX_IMAGE_BYTES, blockOversizeSubmit } from "@/lib/upload-limits";
 import { uploadProductImageAction, type ProductState } from "../actions";
 
 const initial: ProductState = {};
@@ -14,6 +16,8 @@ export function ProductImageControls({
 }) {
   const action = uploadProductImageAction.bind(null, productId);
   const [state, formAction, pending] = useActionState<ProductState, FormData>(action, initial);
+  const [tooBig, setTooBig] = useState<string | null>(null);
+  const [formRef, submitForm] = useKeptForm(formAction, state, true);
 
   return (
     <div className="space-y-2">
@@ -29,7 +33,15 @@ export function ProductImageControls({
           No image
         </div>
       )}
-      <form action={formAction} className="space-y-2">
+      <form
+        ref={formRef}
+        action={formAction}
+        onSubmit={(e) => {
+          setTooBig(blockOversizeSubmit(e, MAX_IMAGE_BYTES));
+          submitForm(e);
+        }}
+        className="space-y-2"
+      >
         <input
           type="file"
           name="image"
@@ -45,8 +57,8 @@ export function ProductImageControls({
           {pending ? "Uploading…" : imageAssetId ? "Replace image" : "Upload image"}
         </button>
       </form>
-      {state.error && <p className="text-sm text-red-600">{state.error}</p>}
-      {state.success && <p className="text-sm text-emerald-600">Image updated.</p>}
+      {(tooBig ?? state.error) && <p className="text-sm text-red-600">{tooBig ?? state.error}</p>}
+      {!tooBig && state.success && <p className="text-sm text-emerald-600">Image updated.</p>}
     </div>
   );
 }

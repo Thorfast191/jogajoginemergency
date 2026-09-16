@@ -9,6 +9,7 @@ import { MascotCheer, MascotThink } from "@/components/illustrations";
 import { subscribeAction, cancelSubscriptionAction } from "./actions";
 import { enabledGateways } from "@/lib/payments/enabled";
 import { intervalLabel } from "@/lib/subscription-periods";
+import { PaymentNotice } from "@/components/payment-notice";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +26,11 @@ const WITHOUT_IT = [
   "You keep every sticker and QR you bought",
 ];
 
-export default async function SubscriptionPage() {
+export default async function SubscriptionPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ payment?: string | string[] }>;
+}) {
   const user = await getCustomer();
   if (!user) redirect("/login");
 
@@ -53,6 +58,10 @@ export default async function SubscriptionPage() {
         title="Plus"
         subtitle="A subscription is what makes the page your QR codes open actually show your information."
       />
+
+      <div className="mt-6 empty:hidden">
+        <PaymentNotice code={(await searchParams).payment} />
+      </div>
 
       <Card className="mt-6">
         <div className="flex items-start gap-4">

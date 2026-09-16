@@ -65,6 +65,10 @@ export default async function ScanPage({ params }: { params: Promise<{ shortCode
   const location = approxLocationFrom(h);
   const owner = { id: tag.userId, email: tag.user.email, notify: tag.user.notifyOnScan };
   const tagLabel = tag.internalLabel ?? tag.product?.name ?? `/t/${shortCode}`;
+  // A scalar, not `tag`: the callback below outlives the response, and closing
+  // over the tag would hold this person's medical notes and next of kin in
+  // memory until the database write and the email have finished.
+  const tagId = tag.id;
 
   after(async () => {
     try {
@@ -73,12 +77,12 @@ export default async function ScanPage({ params }: { params: Promise<{ shortCode
 
       const scannedAt = new Date();
       await prisma.scanEvent.create({
-        data: { tagId: tag.id, ipHash: hashIp(ip), userAgent, scannedAt, ...location },
+        data: { tagId, ipHash: hashIp(ip), userAgent, scannedAt, ...location },
       });
 
       // Tell the owner — but at most once every ten minutes per tag, so
       // someone refreshing the page does not fill an inbox.
-      const notifiable = await rateLimit(`scan-notify:${tag.id}`, {
+      const notifiable = await rateLimit(`scan-notify:${tagId}`, {
         limit: 1,
         windowMs: 10 * 60_000,
       });
@@ -86,7 +90,7 @@ export default async function ScanPage({ params }: { params: Promise<{ shortCode
         await notifyOwnerOfScan({
           userId: owner.id,
           ownerEmail: owner.email,
-          tagId: tag.id,
+          tagId,
           tagLabel,
           scannedAt,
           approxLocation: formatLocation(location),

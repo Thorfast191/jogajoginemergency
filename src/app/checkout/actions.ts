@@ -4,8 +4,8 @@ import { redirect } from "next/navigation";
 import { Prisma } from "@prisma/client";
 import { requireCustomer } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { checkoutSchema } from "@/lib/validations";
-import { generateOrderNumber } from "@/lib/order";
+import { checkoutSchema, firstIssue } from "@/lib/validations";
+import { generateOrderNumber, orderMatchesCart } from "@/lib/order";
 import { readCart, resolveCart } from "@/lib/cart-server";
 import { enabledGatewayFor } from "@/lib/payments/enabled";
 import { getSettings } from "@/lib/settings";
@@ -44,7 +44,7 @@ export async function createOrderAction(
     shipCity: formData.get("shipCity") || null,
     shipNote: formData.get("shipNote") || null,
   });
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  if (!parsed.success) return { error: firstIssue(parsed.error) };
 
   // A super admin can pause new orders (out of stock, a holiday). Checked here
   // and not just hidden in the UI, so an open checkout tab can't slip one in.
@@ -71,8 +71,18 @@ export async function createOrderAction(
     redirect(`/checkout/success?order=${existing.orderNumber}`);
   }
 
+  // Submitting the same form again resumes the order it created. That order is
+  // what gets paid for, so the cart must still describe it: billing today's
+  // cart against yesterday's order once let one sticker's price pay for five.
+  if (existing && !orderMatchesCart(existing.items, cart.lines)) {
+    return { error: CART_CHANGED };
+  }
+
   let paymentId = "";
   let orderId = existing?.id ?? "";
+  let amount = existing
+    ? { totalCents: existing.totalCents, currency: existing.currency }
+    : { totalCents: cart.totalCents, currency: cart.currency };
   try {
     if (!orderId) {
       ({ orderId } = await prisma.$transaction(async (tx) => {
@@ -116,7 +126,9 @@ export async function createOrderAction(
       const winner = await findOwnOrderByKey(idempotencyKey, user.id);
       if (!winner) throw e;
       if (winner.status === "PAID") redirect(`/checkout/success?order=${winner.orderNumber}`);
+      if (!orderMatchesCart(winner.items, cart.lines)) return { error: CART_CHANGED };
       orderId = winner.id;
+      amount = { totalCents: winner.totalCents, currency: winner.currency };
     } else {
       throw e;
     }
@@ -126,8 +138,8 @@ export async function createOrderAction(
     data: {
       kind: "ORDER",
       orderId,
-      amountCents: cart.totalCents,
-      currency: cart.currency,
+      amountCents: amount.totalCents,
+      currency: amount.currency,
       provider: gateway.id,
       status: "PENDING",
     },
@@ -140,8 +152,8 @@ export async function createOrderAction(
     await warnOnOriginMismatch("checkout");
     const result = await gateway.initiate({
       paymentId,
-      amountCents: cart.totalCents,
-      currency: cart.currency,
+      amountCents: amount.totalCents,
+      currency: amount.currency,
       description: cart.lines.map((l) => l.name).join(", ").slice(0, 100),
       customer: { name: user.name, email: user.email },
       callbackUrl: `${appUrl()}/api/payments/callback?payment=${paymentId}`,
@@ -173,11 +185,22 @@ export async function createOrderAction(
   redirect(redirectUrl);
 }
 
+const CART_CHANGED =
+  "Your cart changed after this checkout page was opened. Please reload the page to review your order.";
+
 /** The order previously placed under this key, if it belongs to this user. */
 async function findOwnOrderByKey(key: string, userId: string) {
   const order = await prisma.order.findUnique({
     where: { idempotencyKey: key },
-    select: { id: true, orderNumber: true, userId: true, status: true },
+    select: {
+      id: true,
+      orderNumber: true,
+      userId: true,
+      status: true,
+      totalCents: true,
+      currency: true,
+      items: { select: { productId: true, quantity: true, unitPriceCents: true, currency: true } },
+    },
   });
   return order && order.userId === userId ? order : null;
 }

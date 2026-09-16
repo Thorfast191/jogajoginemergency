@@ -4,6 +4,7 @@ import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { firstIssue } from "@/lib/validations";
 
 const schema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters"),
@@ -17,7 +18,7 @@ export async function resetPasswordAction(
   formData: FormData
 ): Promise<ResetPasswordState> {
   const parsed = schema.safeParse({ password: formData.get("password") });
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  if (!parsed.success) return { error: firstIssue(parsed.error) };
 
   const hashedToken = crypto.createHash("sha256").update(rawToken).digest("hex");
 

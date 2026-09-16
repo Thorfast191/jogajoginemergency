@@ -39,11 +39,16 @@ export default async function AdminOrderDetailPage({
   });
   if (!order) notFound();
 
+  // A deactivated code is left out of the print file, so it must not count
+  // towards the order being ready — otherwise the parcel ships a sticker short.
+  // A replacement is printed but stands in for a code that already existed.
+  const printableTags = (tags: { status: string; isReplacement: boolean }[]) =>
+    tags.filter((t) => t.status !== "DEACTIVATED" && !t.isReplacement).length;
   const readiness = printReadiness(
     order.items.map((i) => ({
       quantity: i.quantity,
       qrSlots: i.product.qrSlots,
-      tagsGenerated: i.tags.length,
+      tagsGenerated: printableTags(i.tags),
     })),
   );
   const printable = order.items.some((i) => i.tags.some((t) => t.status !== "DEACTIVATED"));
@@ -130,6 +135,7 @@ export default async function AdminOrderDetailPage({
                         </Link>
                         <p className="text-black/50">
                           {t.status} · {t.theme?.name ?? "Default theme"}
+                          {t.isReplacement ? " · replacement" : ""}
                         </p>
                         <p className="mt-1 flex gap-2">
                           <a href={`/api/tags/${t.id}/sticker?download=1`} className="text-[var(--color-primary-dark)] hover:underline">

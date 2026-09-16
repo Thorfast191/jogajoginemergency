@@ -14,7 +14,9 @@ export default async function ShopPage() {
   const products = await prisma.product.findMany({
     where: { status: "ACTIVE" },
     orderBy: { sortOrder: "asc" },
-    include: { theme: { select: { id: true, name: true } } },
+    // Only a live theme has a public preview image; a drafted or archived one
+    // would render a broken image instead of the product's own photo.
+    include: { theme: { select: { id: true, name: true, status: true } } },
   });
 
   return (
@@ -41,14 +43,16 @@ export default async function ShopPage() {
             </div>
           ) : (
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-              {products.map((p, i) => (
+              {products.map((p, i) => {
+                const preview = p.theme?.status === "ACTIVE" ? p.theme : null;
+                return (
                 <Reveal key={p.id} delay={i * 80}>
                   <div className="group flex h-full flex-col overflow-hidden rounded-2xl border border-black/10 bg-white hover-lift">
                     <Link href={`/shop/${p.slug}`} className="relative block overflow-hidden bg-black/[0.03]">
-                      {p.theme || p.imageAssetId ? (
+                      {preview || p.imageAssetId ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
-                          src={p.theme ? `/api/themes/${p.theme.id}/preview` : `/media/${p.imageAssetId}`}
+                          src={preview ? `/api/themes/${preview.id}/preview` : `/media/${p.imageAssetId}`}
                           alt={p.name}
                           loading="lazy"
                           className="aspect-square w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
@@ -64,9 +68,9 @@ export default async function ShopPage() {
                       <Link href={`/shop/${p.slug}`} className="font-bold hover:text-[var(--color-primary)]">
                         {p.name}
                       </Link>
-                      {p.theme && (
+                      {preview && (
                         <p className="mt-1">
-                          <Badge tone="neutral">{p.theme.name} theme</Badge>
+                          <Badge tone="neutral">{preview.name} theme</Badge>
                         </p>
                       )}
                       <p className="mt-2 flex-1 text-sm text-black/60">{p.tagline}</p>
@@ -85,7 +89,8 @@ export default async function ShopPage() {
                     </div>
                   </div>
                 </Reveal>
-              ))}
+                );
+              })}
             </div>
           )}
 

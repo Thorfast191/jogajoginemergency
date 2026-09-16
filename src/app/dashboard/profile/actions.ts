@@ -3,14 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { requireCustomer } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import {
-  emergencyProfileSchema,
-  emergencyContactSchema,
-  profileLinkSchema,
-  bioSchema,
-} from "@/lib/validations";
+import { emergencyProfileSchema, emergencyContactSchema, profileLinkSchema, bioSchema, firstIssue } from "@/lib/validations";
 import { PRESET_FLAGS } from "@/lib/privacy";
 import { processImage, MediaError } from "@/lib/media";
+import { ensureProfile } from "@/lib/profile";
+import { MAX_IMAGE_BYTES, oversizeMessage } from "@/lib/upload-limits";
 
 const MAX_CONTACTS = 5;
 
@@ -20,15 +17,6 @@ function revalidateProfileViews() {
   revalidatePath("/dashboard/profile");
   revalidatePath("/dashboard/privacy");
   revalidatePath("/dashboard");
-}
-
-/** Load the caller's profile, creating a STANDARD-visibility row on first use. */
-export async function ensureProfile(userId: string) {
-  return prisma.emergencyProfile.upsert({
-    where: { userId },
-    update: {},
-    create: { userId, visibilityPreset: "STANDARD", ...PRESET_FLAGS.STANDARD },
-  });
 }
 
 export async function updateEmergencyProfileAction(
@@ -52,7 +40,7 @@ export async function updateEmergencyProfileAction(
     phonePublic: formData.get("phonePublic") || null,
   });
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+    return { error: firstIssue(parsed.error) };
   }
 
   const d = parsed.data;
@@ -117,7 +105,7 @@ export async function addContactAction(
   }
 
   const parsed = parseContact(formData);
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  if (!parsed.success) return { error: firstIssue(parsed.error) };
 
   await prisma.emergencyContact.create({
     data: {
@@ -154,7 +142,7 @@ export async function updateContactAction(
   if (!owned) return { error: "Contact not found." };
 
   const parsed = parseContact(formData);
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  if (!parsed.success) return { error: firstIssue(parsed.error) };
 
   await prisma.emergencyContact.update({
     where: { id: owned.id },
@@ -210,7 +198,6 @@ export async function reorderContactsAction(orderedIds: string[]) {
 
 export type PhotoState = { error?: string; success?: boolean };
 
-const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 
 export async function uploadProfilePhotoAction(
   _prev: PhotoState,
@@ -225,7 +212,7 @@ export async function uploadProfilePhotoAction(
 
   const file = formData.get("photo");
   if (!(file instanceof File) || file.size === 0) return { error: "Choose an image to upload." };
-  if (file.size > MAX_PHOTO_BYTES) return { error: "Image is larger than 5 MB." };
+  if (file.size > MAX_IMAGE_BYTES) return { error: oversizeMessage(MAX_IMAGE_BYTES) };
 
   let processed;
   try {
@@ -306,7 +293,7 @@ export async function updateBioAction(
   }
 
   const parsed = bioSchema.safeParse({ bio: formData.get("bio") || null });
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  if (!parsed.success) return { error: firstIssue(parsed.error) };
 
   const profile = await ensureProfile(user.id);
   await prisma.emergencyProfile.update({
@@ -340,7 +327,7 @@ export async function addLinkAction(_prev: LinkState, formData: FormData): Promi
   if (count >= MAX_LINKS) return { error: `You can add up to ${MAX_LINKS} links.` };
 
   const parsed = parseLink(formData);
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  if (!parsed.success) return { error: firstIssue(parsed.error) };
 
   await prisma.profileLink.create({
     data: {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { useKeptForm } from "@/lib/use-kept-form";
 import Link from "next/link";
 import { resetPasswordAction, type ResetPasswordState } from "./actions";
 
@@ -9,6 +10,7 @@ const initialState: ResetPasswordState = {};
 export function ResetPasswordForm({ token }: { token: string }) {
   const action = resetPasswordAction.bind(null, token);
   const [state, formAction, pending] = useActionState(action, initialState);
+  const [formRef, submitForm] = useKeptForm(formAction, state);
 
   if (state.success) {
     return (
@@ -22,7 +24,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
   }
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form ref={formRef} action={formAction} onSubmit={submitForm} className="space-y-4">
       <div>
         <label className="block text-sm font-medium mb-1" htmlFor="password">
           New password

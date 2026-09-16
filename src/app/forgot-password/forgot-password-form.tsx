@@ -1,12 +1,14 @@
 "use client";
 
 import { useActionState } from "react";
+import { useKeptForm } from "@/lib/use-kept-form";
 import { forgotPasswordAction, type ForgotPasswordState } from "./actions";
 
 const initialState: ForgotPasswordState = {};
 
 export function ForgotPasswordForm() {
   const [state, formAction, pending] = useActionState(forgotPasswordAction, initialState);
+  const [formRef, submitForm] = useKeptForm(formAction, state);
 
   if (state.submitted) {
     return (
@@ -18,7 +20,7 @@ export function ForgotPasswordForm() {
   }
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form ref={formRef} action={formAction} onSubmit={submitForm} className="space-y-4">
       <div>
         <label className="block text-sm font-medium mb-1" htmlFor="email">
           Email

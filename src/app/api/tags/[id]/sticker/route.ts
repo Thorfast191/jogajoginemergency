@@ -13,7 +13,12 @@ import { stickerPdf } from "@/lib/sticker";
 //
 // The image carries the tag's short code, which is all a stranger needs to
 // open the emergency page, so only the owner and staff who manage QR codes may
-// fetch it, and nothing may cache it. Refusals are 404s.
+// fetch it, and no shared cache may keep it. Refusals are 404s.
+//
+// A sticker is a pure function of (theme artwork, square size, short code), so
+// it carries an ETag and revalidates: a list of fifty thumbnails re-renders
+// nothing on a second visit, while a deleted tag still 404s on the next
+// request because every use revalidates.
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const user = await requireActiveUser();
@@ -27,12 +32,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const thumb = !pdf && query.get("size") === "thumb";
   const download = pdf || query.get("download") === "1";
 
-  const sticker = await renderTagSticker(tag, { thumb });
-  const body = pdf ? await stickerPdf([sticker], tag.widthMm) : new Uint8Array(sticker.png);
-
+  const variant = pdf ? `pdf-${tag.widthMm}` : thumb ? "thumb" : "png";
+  const etag = `"tag-${tag.shortCode}-${tag.themeVersion}-${tag.theme.qrBoxSize}-${variant}"`;
   const headers = new Headers({
     "Content-Type": pdf ? "application/pdf" : "image/png",
-    "Cache-Control": "private, no-store",
+    ETag: etag,
+    "Cache-Control": "private, max-age=0, must-revalidate",
   });
   if (download) {
     headers.set(
@@ -40,6 +45,13 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       `attachment; filename="jogajog-sticker-${tag.shortCode}.${pdf ? "pdf" : "png"}"`,
     );
   }
+
+  if (req.headers.get("if-none-match") === etag) {
+    return new NextResponse(null, { status: 304, headers });
+  }
+
+  const sticker = await renderTagSticker(tag, { thumb });
+  const body = pdf ? await stickerPdf([sticker], tag.widthMm) : new Uint8Array(sticker.png);
   return new NextResponse(body as BodyInit, { headers });
 }
 

@@ -287,3 +287,80 @@ export const orderStatusSchema = z.object({
 export const fulfillmentStatusSchema = z.object({
   status: z.enum(["UNFULFILLED", "PROCESSING", "SHIPPED", "DELIVERED"]),
 });
+
+// --- Error messages ---------------------------------------------------
+
+const FIELD_LABELS: Record<string, string> = {
+  name: "Name",
+  email: "Email",
+  phone: "Phone",
+  password: "Password",
+  currentPassword: "Current password",
+  newPassword: "New password",
+  displayName: "Display name",
+  emergencyMessage: "Emergency message",
+  bloodGroup: "Blood group",
+  allergies: "Allergies",
+  medicalNotes: "Medical notes",
+  phonePublic: "Public phone number",
+  relation: "Relationship",
+  label: "Label",
+  url: "URL",
+  bio: "Bio",
+  internalLabel: "Label",
+  shipName: "Shipping name",
+  shipPhone: "Shipping phone",
+  shipAddress: "Address",
+  shipCity: "City",
+  shipNote: "Delivery note",
+  finderContact: "Your phone or email",
+  message: "Message",
+  reason: "Reason",
+  details: "Details",
+  slug: "Slug",
+  tagline: "Tagline",
+  description: "Description",
+  useCase: "Use case",
+  priceCents: "Price",
+  currency: "Currency",
+  qrSlots: "QR slots",
+  stickerWidthMm: "Sticker width",
+  sortOrder: "Sort order",
+};
+
+// zod's own wording ("Too big: expected string to have <=20 characters") is
+// for developers. Anything else was written into a schema for people.
+const ZOD_DEFAULT = /^(Too big|Too small|Invalid input|Invalid option|Invalid email address|Invalid string)/;
+
+function plainWords(issue: z.core.$ZodIssue): string {
+  const i = issue as z.core.$ZodIssue & { origin?: string; minimum?: number | bigint; maximum?: number | bigint; format?: string };
+  const text = i.origin === "string" || i.origin === undefined;
+  switch (i.code) {
+    case "too_big":
+      return text ? `must be ${i.maximum} characters or fewer` : `must be at most ${i.maximum}`;
+    case "too_small":
+      if (text) return Number(i.minimum) <= 1 ? "is required" : `must be at least ${i.minimum} characters`;
+      return `must be at least ${i.minimum}`;
+    case "invalid_format":
+      return i.format === "email" ? "must be a valid email address" : "isn't in the right format";
+    case "invalid_value":
+      return "isn't one of the allowed choices";
+    case "invalid_type":
+      return "is required";
+    default:
+      return "is invalid";
+  }
+}
+
+/**
+ * The first validation problem, as a sentence for the person who typed it:
+ * "Public phone number: must be 20 characters or fewer."
+ */
+export function firstIssue(error: z.ZodError): string {
+  const issue = error.issues[0];
+  if (!issue) return "Invalid input";
+  if (!ZOD_DEFAULT.test(issue.message)) return issue.message;
+  const words = plainWords(issue);
+  const field = FIELD_LABELS[String(issue.path[0] ?? "")];
+  return field ? `${field}: ${words}.` : `${words[0].toUpperCase()}${words.slice(1)}.`;
+}

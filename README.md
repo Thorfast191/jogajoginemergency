@@ -136,6 +136,7 @@ callbacks are built from it. If port 3000 is taken, run `npm run dev -- -p 3100`
 | `SMTP_*`, `MAIL_FROM` | Outgoing mail; without these nothing is delivered |
 | `MAINTENANCE_SECRET` | Bearer token for `/api/maintenance`; unset means it 404s |
 | `RATE_LIMIT_STORE` | `postgres` to share rate limits across instances |
+| `TRUSTED_PROXY_HOPS` | Proxies in front of the app (default 1). Set 0 when nothing is |
 
 ## Project layout
 
@@ -161,7 +162,11 @@ callbacks are built from it. If port 3000 is taken, run `npm run dev -- -p 3100`
 Three gateways — **bKash**, **Nagad** and **SSLCommerz** — behind one interface
 (`src/lib/payments/`). A provider whose environment variables are blank is not offered, and a
 super admin can switch off a configured one (`src/lib/payments/enabled.ts`). A `DEMO` provider
-settles inline with no money for local development, and is refused when `PAYMENT_MODE=live`.
+takes no money for local development, and is refused when `PAYMENT_MODE=live`. It stops on a
+demo payment page (`/checkout/demo`) where you choose to pay, decline or cancel; those buttons
+are plain links, so the return to the callback is a real page load as it is with a provider.
+A Server Action redirect to our own origin is a client-side navigation, which ran the callback
+without the browser ever requesting it — and so never cleared the cart.
 
 **Nothing in a callback is treated as evidence.** `settlePayment` re-verifies with the
 provider and checks the amount and currency match before fulfilling anything. Settlement is
@@ -200,11 +205,18 @@ and checkout say so and the checkout action refuses.
 (buy a sticker)  →  QR slots granted
 (generate)       →  ACTIVE        owned, scannable, printed into the sticker
                     LOST          owner or admin flagged it; the scan page shows a return banner
-                    DEACTIVATED   taken down by the owner or a super admin; the scan page 404s
+                    DEACTIVATED   switched off by the owner, or taken down by a super admin;
+                                  the scan page 404s
 ```
 
-Deleting a tag frees its slot. Staff can issue a replacement QR without spending a slot but can
-never move a tag between accounts.
+`Tag.takenDownAt` tells the two kinds of DEACTIVATED apart (`canSetTagStatus` in
+`src/lib/admin-guards.ts`). The owner can switch their own code off and on again but cannot undo a
+takedown; staff can lift a takedown but cannot switch on a code its owner turned off, and a super
+admin can turn an owner's switch-off into a takedown.
+
+Owners switch a code off rather than delete it: `deleteTagAction` (which would free the slot and
+drop the code's scan history) exists but no page offers it. Staff can issue a replacement QR
+without spending a slot but can never move a tag between accounts.
 
 ## Privacy & security
 
@@ -216,6 +228,10 @@ never move a tag between accounts.
 - `/media/[id]` authorizes every read; sticker and QR downloads are `private, no-store` because
   they carry the short code.
 - Raw scanner IPs are never stored. Login is throttled per email and per IP.
+- The caller's address is read from `X-Forwarded-For` **counting back from the end**,
+  `TRUSTED_PROXY_HOPS` hops (default 1). Everything further left is the caller's own
+  claim: reading the first entry instead let anyone mint a fresh rate-limit bucket per
+  request and walk past the login, signup, relay, abuse and scan limits.
 - A password change or a role change revokes outstanding JWTs.
 - Security headers (CSP, HSTS, frame denial) are set in `next.config.ts`; production refuses to
   boot on missing secrets (`src/lib/env.ts`).
@@ -241,3 +257,10 @@ docker compose exec app npm run db:seed
 
 Set real `AUTH_SECRET`, `NEXTAUTH_URL`, `NEXT_PUBLIC_APP_URL` and `IP_HASH_SALT` before
 deploying.
+
+**Put a reverse proxy in front** (nginx, Caddy, a load balancer) that terminates TLS and
+*appends* the client address to `X-Forwarded-For`, and publish only the proxy — the compose
+file's `3000:3000` is for trying it out. Next.js only fills that header itself when the caller
+didn't send one, so an app exposed directly can't tell a real address from an invented one:
+with the default `TRUSTED_PROXY_HOPS=1` a caller picks their own rate-limit bucket, and with
+`0` every visitor shares one, so a single abuser can lock everyone out of signing in.

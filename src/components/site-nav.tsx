@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { auth } from "@/lib/auth";
-import { readCart } from "@/lib/cart-server";
+import { requireActiveUser } from "@/lib/session";
+import { readLiveCart } from "@/lib/cart-server";
 import { cartCount } from "@/lib/cart";
 import { isStaff } from "@/lib/permissions";
 import { getSettings } from "@/lib/settings";
@@ -15,11 +15,14 @@ const LINKS: NavItem[] = [
 ];
 
 export async function SiteNav() {
-  const [session, cart, settings] = await Promise.all([auth(), readCart(), getSettings()]);
+  // The role comes from the database, not the session token: a token outlives a
+  // role change, and pointing "Dashboard" at /admin for someone who was just
+  // demoted sends them on a pointless trip through the login page.
+  const [user, cart, settings] = await Promise.all([requireActiveUser(), readLiveCart(), getSettings()]);
   const count = cartCount(cart);
 
-  const account: NavItem[] = session?.user
-    ? [{ href: isStaff(session.user.role) ? "/admin" : "/dashboard", label: "Dashboard" }]
+  const account: NavItem[] = user
+    ? [{ href: isStaff(user.role) ? "/admin" : "/dashboard", label: "Dashboard" }]
     : [
         { href: "/login", label: "Log in" },
         { href: "/signup", label: "Create account" },
@@ -63,7 +66,7 @@ export async function SiteNav() {
                 </span>
               )}
             </Link>
-            {session?.user ? (
+            {user ? (
               <Link
                 href={account[0].href}
                 className="hidden rounded-xl bg-[var(--color-primary)] px-4 py-2 font-semibold text-white transition-transform hover:scale-[1.03] sm:inline-block"

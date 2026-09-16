@@ -169,7 +169,12 @@ export default async function AdminTagsPage({
                   </td>
                   <td className="px-4 py-3 tabular-nums">{t._count.scanEvents}</td>
                   <td className="px-4 py-3">
-                    <TagStatusSelect tagId={t.id} status={t.status} canDeactivate={canDeactivate} />
+                    <TagStatusSelect
+                      tagId={t.id}
+                      status={t.status}
+                      takenDown={t.takenDownAt !== null}
+                      canDeactivate={canDeactivate}
+                    />
                   </td>
                 </tr>
               ))

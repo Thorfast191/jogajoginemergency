@@ -386,7 +386,15 @@ model Tag {
   productId     String?
   themeId       String?
   internalLabel String?
+  // A code an admin minted to replace a damaged sticker or a taken-down QR.
+  // It does not spend one of the customer's purchased slots, and it does not
+  // count towards an order being ready to print.
+  isReplacement Boolean   @default(false)
   status        TagStatus @default(ACTIVE)
+  // Set when a super admin takes the code down (status DEACTIVATED). The owner
+  // can switch their own code off and on, but not undo a takedown; staff can
+  // lift a takedown, but not switch on a code its owner turned off.
+  takenDownAt   DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 

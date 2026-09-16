@@ -17,7 +17,13 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
   const product = await prisma.product.findUnique({ where: { slug }, include: { theme: true } });
   if (!product || product.status !== "ACTIVE") notFound();
 
-  const theme = product.theme as (ThemeSkin & { id: string }) | null;
+  // Only a live theme has a public preview image. With a drafted or archived
+  // theme the page falls back to the product's own photo rather than showing a
+  // broken image to a shopper.
+  const theme =
+    product.theme && product.theme.status === "ACTIVE"
+      ? (product.theme as ThemeSkin & { id: string })
+      : null;
 
   return (
     <div className="flex min-h-screen flex-col">

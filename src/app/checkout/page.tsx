@@ -6,11 +6,16 @@ import { readCart, resolveCart } from "@/lib/cart-server";
 import { formatPrice } from "@/lib/money";
 import { getSettings } from "@/lib/settings";
 import { enabledGateways } from "@/lib/payments/enabled";
+import { PaymentNotice } from "@/components/payment-notice";
 import { CheckoutForm } from "./checkout-form";
 
 export const dynamic = "force-dynamic";
 
-export default async function CheckoutPage() {
+export default async function CheckoutPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ payment?: string | string[] }>;
+}) {
   const user = await getCustomer();
   if (!user) redirect("/login?next=/checkout");
 
@@ -30,6 +35,10 @@ export default async function CheckoutPage() {
         Stickers are a one-time purchase. You&apos;ll generate your QR codes straight after, and we
         print them into your stickers.
       </p>
+
+      <div className="mt-6 empty:hidden">
+        <PaymentNotice code={(await searchParams).payment} />
+      </div>
 
       <ul className="mt-6 divide-y divide-black/10 rounded-2xl border border-black/10 bg-white">
         {cart.lines.map((line) => (

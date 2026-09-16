@@ -26,6 +26,32 @@ export default async function CheckoutSuccessPage({
     : null;
   if (!order) redirect("/dashboard/orders");
 
+  // Only a paid order is confirmed. Anyone can reach this URL for their own
+  // pending or cancelled order, and "Order confirmed" there would be false.
+  if (order.status !== "PAID") {
+    return (
+      <div className="mx-auto max-w-xl px-4 py-16">
+        <h1 className="text-3xl font-bold">This order isn&apos;t paid</h1>
+        <p className="mt-2 text-sm text-black/60">
+          Order <span className="font-mono">{order.orderNumber}</span> is{" "}
+          {order.status === "CANCELLED" ? "cancelled" : "still waiting for payment"}, so no QR codes
+          have been added for it.
+        </p>
+        <div className="mt-8 flex flex-wrap gap-3">
+          <Link href="/cart" className={ButtonLinkClass()}>
+            Back to my cart
+          </Link>
+          <Link
+            href={`/dashboard/orders/${order.id}`}
+            className="rounded-xl border border-black/15 px-6 py-3 font-semibold hover:bg-black/5"
+          >
+            View the order
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   const [balance, entitled] = await Promise.all([
     slotBalanceForUser(user.id),
     userIsEntitled(user.id),

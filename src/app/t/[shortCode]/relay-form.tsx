@@ -13,11 +13,20 @@ export function RelayForm({ shortCode }: { shortCode: string }) {
     setStatus("sending");
     setError(null);
 
-    const res = await fetch(`/api/relay/${shortCode}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ finderContact, message }),
-    });
+    // A finder is often on a weak mobile signal. A request that never arrives
+    // must say so, not leave the button stuck on "Sending…".
+    let res: Response;
+    try {
+      res = await fetch(`/api/relay/${shortCode}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ finderContact, message }),
+      });
+    } catch {
+      setError("Couldn't send — check your connection and try again.");
+      setStatus("error");
+      return;
+    }
 
     if (res.ok) {
       setStatus("sent");

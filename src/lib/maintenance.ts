@@ -34,17 +34,24 @@ export async function runMaintenance(now: number = Date.now()): Promise<Maintena
       select: { userId: true, user: { select: { email: true } } },
     });
 
+    if (due.length === 0) continue;
+
+    // One warning per user per day, whatever else ran. Asked once for the whole
+    // slice: a per-subscription lookup is a round trip each, and this also runs
+    // synchronously behind the "Run maintenance now" button.
+    const warnedRows = await prisma.notificationLog.findMany({
+      where: {
+        userId: { in: due.map((s) => s.userId) },
+        kind: "SUBSCRIPTION_EXPIRING",
+        createdAt: { gte: new Date(now - DAY_MS) },
+      },
+      select: { userId: true },
+    });
+    const warned = new Set(warnedRows.map((r) => r.userId));
+
     for (const sub of due) {
-      // One warning per user per day, whatever else ran.
-      const already = await prisma.notificationLog.findFirst({
-        where: {
-          userId: sub.userId,
-          kind: "SUBSCRIPTION_EXPIRING",
-          createdAt: { gte: new Date(now - DAY_MS) },
-        },
-        select: { id: true },
-      });
-      if (already) continue;
+      if (warned.has(sub.userId)) continue;
+      warned.add(sub.userId);
 
       await notifySubscriptionExpiring({
         userId: sub.userId,

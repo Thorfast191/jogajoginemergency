@@ -3,8 +3,9 @@
 import bcrypt from "bcryptjs";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { signupSchema } from "@/lib/validations";
+import { signupSchema, firstIssue } from "@/lib/validations";
 import { isSafeNext } from "@/lib/nav";
+import { AuthError } from "next-auth";
 import { signIn } from "@/lib/auth";
 import { recordHit } from "@/lib/rate-limit";
 import { getClientIp } from "@/lib/client-ip";
@@ -30,7 +31,7 @@ export async function signupAction(
   });
 
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+    return { error: firstIssue(parsed.error) };
   }
 
   const ip = await getClientIp();
@@ -51,9 +52,18 @@ export async function signupAction(
     data: { name, email, phone: phone || null, passwordHash },
   });
 
-  await signIn("credentials", { email, password, redirect: false });
-
   const nextRaw = formData.get("next");
   const next = typeof nextRaw === "string" && isSafeNext(nextRaw) ? nextRaw : "/dashboard";
+
+  // The account exists either way. If signing in is refused — this connection
+  // is throttled for failed logins — send them to log in rather than to an
+  // error page that suggests the sign-up failed.
+  try {
+    await signIn("credentials", { email, password, redirect: false });
+  } catch (err) {
+    if (err instanceof AuthError) redirect(`/login?next=${encodeURIComponent(next)}`);
+    throw err;
+  }
+
   redirect(next);
 }

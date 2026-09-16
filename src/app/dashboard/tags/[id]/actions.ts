@@ -3,9 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { requireCustomer } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { tagCustomerUpdateSchema } from "@/lib/validations";
+import { tagCustomerUpdateSchema, firstIssue } from "@/lib/validations";
 import { entitledThemeIdsForUser } from "@/lib/theme-access-server";
 import { canUseTheme } from "@/lib/theme-access";
+import { canSetTagStatus } from "@/lib/admin-guards";
 
 export type TagUpdateState = { error?: string; success?: boolean };
 
@@ -31,14 +32,24 @@ export async function updateTagAction(
     status: formData.get("status") || undefined,
   });
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+    return { error: firstIssue(parsed.error) };
   }
+
+  const next = parsed.data.status ?? tag.status;
+  const verdict = canSetTagStatus({
+    by: "owner",
+    mayTakeDown: false,
+    current: tag.status,
+    takenDown: tag.takenDownAt !== null,
+    next,
+  });
+  if (!verdict.ok) return { error: verdict.reason };
 
   await prisma.tag.update({
     where: { id: tag.id },
     data: {
       internalLabel: parsed.data.internalLabel ?? null,
-      status: parsed.data.status,
+      status: next,
     },
   });
 

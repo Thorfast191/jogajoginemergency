@@ -10,7 +10,7 @@ import {
   FLAG_NAMES,
   type VisibilityFlags,
 } from "@/lib/privacy";
-import { ensureProfile } from "@/app/dashboard/profile/actions";
+import { ensureProfile } from "@/lib/profile";
 
 export type PrivacyInput =
   | { preset: "MINIMAL" | "STANDARD" | "FULL" }
@@ -26,26 +26,36 @@ export async function updatePrivacyAction(
     return { error: "Not authorized." };
   }
 
-  const profile = await ensureProfile(user.id);
+  await ensureProfile(user.id);
 
-  let flags: VisibilityFlags;
   if ("preset" in input) {
     const parsed = privacyPresetSchema.safeParse(input);
     if (!parsed.success) return { error: "Invalid preset." };
-    flags = applyPreset(parsed.data.preset);
+    const flags = applyPreset(parsed.data.preset);
+    await prisma.emergencyProfile.update({
+      where: { userId: user.id },
+      data: { ...flags, visibilityPreset: detectPreset(flags) },
+    });
   } else {
     const parsed = privacyFieldSchema.safeParse(input);
     if (!parsed.success) return { error: "Invalid field." };
-    const current = Object.fromEntries(
-      FLAG_NAMES.map((k) => [k, profile[k]]),
-    ) as unknown as VisibilityFlags;
-    flags = { ...current, [parsed.data.field]: parsed.data.value };
+    // Write only the one flag, then derive the preset from the row as it now
+    // stands. Reading every flag and writing them all back let two toggles
+    // landing together undo each other — turning a field the owner had just
+    // made private public again. The UPDATE's row lock serializes the two, and
+    // the read inside the same transaction sees the other one's committed flag.
+    await prisma.$transaction(async (tx) => {
+      const row = await tx.emergencyProfile.update({
+        where: { userId: user.id },
+        data: { [parsed.data.field]: parsed.data.value },
+      });
+      const flags = Object.fromEntries(FLAG_NAMES.map((k) => [k, row[k]])) as unknown as VisibilityFlags;
+      await tx.emergencyProfile.update({
+        where: { userId: user.id },
+        data: { visibilityPreset: detectPreset(flags) },
+      });
+    });
   }
-
-  await prisma.emergencyProfile.update({
-    where: { userId: user.id },
-    data: { ...flags, visibilityPreset: detectPreset(flags) },
-  });
 
   revalidatePath("/dashboard/privacy");
   revalidatePath("/dashboard");

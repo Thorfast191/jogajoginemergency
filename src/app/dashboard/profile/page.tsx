@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCustomer } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { ensureProfile } from "./actions";
+import { ensureProfile } from "@/lib/profile";
 import { ProfileForm } from "./profile-form";
 import { ContactsEditor } from "./contacts-editor";
 import { PortfolioEditor } from "./portfolio-editor";

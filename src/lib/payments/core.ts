@@ -46,6 +46,24 @@ export function amountMatches(
   return cents === expectedCents;
 }
 
+/**
+ * Whether a payment is for the whole of the order it is attached to.
+ *
+ * The gateway check above proves the provider took what the payment row asked
+ * for. This proves the payment row asked for what the order costs — without
+ * it, any path that bills a different amount against an existing order turns
+ * a small payment into a large fulfilment.
+ */
+export function paymentCoversOrder(
+  payment: { amountCents: number; currency: string },
+  order: { totalCents: number; currency: string },
+): boolean {
+  return (
+    payment.amountCents === order.totalCents &&
+    payment.currency.toUpperCase() === order.currency.toUpperCase()
+  );
+}
+
 const SETTLED: ReadonlySet<SettleStatus> = new Set(["SUCCEEDED", "FAILED", "CANCELLED"]);
 
 /**

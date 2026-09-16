@@ -45,7 +45,7 @@ export async function updateOrderStatusAction(
 
   const order = await prisma.order.findUnique({
     where: { id },
-    select: { status: true, orderNumber: true },
+    select: { status: true, orderNumber: true, placedAt: true },
   });
   if (!order) return { error: "Order not found." };
   if (!ORDER_TRANSITIONS[order.status]?.includes(parsed.data.status)) {
@@ -56,7 +56,11 @@ export async function updateOrderStatusAction(
     where: { id },
     data: {
       status: parsed.data.status,
-      ...(parsed.data.status === "PAID" ? { placedAt: new Date() } : {}),
+      // Only stamp a first purchase date. `placedAt` orders the customer's paid
+      // lines, and that order decides which purchase a newly generated QR is
+      // charged to — moving it would re-attribute their next code to the wrong
+      // sticker (see nextOpenLine in src/lib/slots.ts).
+      ...(parsed.data.status === "PAID" && !order.placedAt ? { placedAt: new Date() } : {}),
     },
   });
   await audit(
@@ -162,6 +166,10 @@ export async function issueReplacementTagAction(orderItemId: string): Promise<Or
       productId: item.productId,
       orderItemId: item.id,
       themeId: item.product.themeId,
+      // Marked as a replacement so it doesn't spend one of the customer's
+      // purchased slots — which would leave them unable to generate the code
+      // they actually paid for.
+      isReplacement: true,
     }),
   );
 

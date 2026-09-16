@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { ACTION_BODY_LIMIT_BYTES } from "./src/lib/upload-limits";
 
 // A Content-Security-Policy tight enough to be worth having, and loose enough
 // for what this app actually does. Next injects inline bootstrap scripts and
@@ -38,6 +39,12 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   output: "standalone",
+
+  // Uploads go through Server Actions, whose 1 MB default body cap would
+  // refuse most phone photos before the action's own limit is ever checked.
+  experimental: {
+    serverActions: { bodySizeLimit: ACTION_BODY_LIMIT_BYTES },
+  },
 
   async headers() {
     return [

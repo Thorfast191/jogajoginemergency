@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState, useTransition } from "react";
+import { useKeptForm } from "@/lib/use-kept-form";
 import { useRouter } from "next/navigation";
 import {
   cancelSubscriptionNowAction,
@@ -34,8 +35,9 @@ export function ExtendForm({ subscriptionId }: { subscriptionId: string }) {
     extendSubscriptionAction.bind(null, subscriptionId),
     initial,
   );
+  const [formRef, submitForm] = useKeptForm(action, state, true);
   return (
-    <form action={action}>
+    <form ref={formRef} action={action} onSubmit={submitForm}>
       <div className="flex flex-wrap gap-2">
         <Months />
         <button
@@ -53,8 +55,9 @@ export function ExtendForm({ subscriptionId }: { subscriptionId: string }) {
 
 export function GrantForm({ userId, plans }: { userId: string; plans: { id: string; name: string }[] }) {
   const [state, action, pending] = useActionState(grantComplimentaryAction.bind(null, userId), initial);
+  const [formRef, submitForm] = useKeptForm(action, state, true);
   return (
-    <form action={action}>
+    <form ref={formRef} action={action} onSubmit={submitForm}>
       <div className="flex flex-wrap gap-2">
         <select name="planId" required className={field} aria-label="Plan" defaultValue={plans[0]?.id}>
           {plans.map((p) => (

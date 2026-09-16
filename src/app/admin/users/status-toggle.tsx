@@ -16,12 +16,9 @@ export function UserStatusToggle({ userId, status }: { userId: string; status: s
         onClick={() => {
           setError(null);
           startTransition(async () => {
-            try {
-              await setUserStatusAction(userId, next);
-              router.refresh();
-            } catch (e) {
-              setError(e instanceof Error ? e.message : "Could not update.");
-            }
+            const res = await setUserStatusAction(userId, next);
+            if (res.error) setError(res.error);
+            else router.refresh();
           });
         }}
         disabled={pending}

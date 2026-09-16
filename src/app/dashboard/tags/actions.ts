@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { Prisma } from "@prisma/client";
 import { requireCustomer } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { createTag } from "@/lib/tag";
@@ -54,24 +55,34 @@ export async function generateTagAction(
 
   let tagId = "";
   try {
-    tagId = await prisma.$transaction(async (tx) => {
-      const used = await tx.tag.count({ where: { userId: user.id } });
-      if (used >= balance.owned) throw new Error("NO_SLOTS");
+    tagId = await prisma.$transaction(
+      async (tx) => {
+        const used = await tx.tag.count({ where: { userId: user.id, isReplacement: false } });
+        if (used >= balance.owned) throw new Error("NO_SLOTS");
 
-      const tag = await createTag(tx, {
-        userId: user.id,
-        productId: line?.productId ?? null,
-        orderItemId: line?.orderItemId ?? null,
-        themeId: line?.themeId ?? fallbackTheme?.id ?? null,
-      });
-      if (label) {
-        await tx.tag.update({ where: { id: tag.id }, data: { internalLabel: label } });
-      }
-      return tag.id;
-    });
+        const tag = await createTag(tx, {
+          userId: user.id,
+          productId: line?.productId ?? null,
+          orderItemId: line?.orderItemId ?? null,
+          themeId: line?.themeId ?? fallbackTheme?.id ?? null,
+        });
+        if (label) {
+          await tx.tag.update({ where: { id: tag.id }, data: { internalLabel: label } });
+        }
+        return tag.id;
+      },
+      // Counting rows and then inserting one is only safe against a second tab
+      // doing the same thing if the two are serialized: at READ COMMITTED both
+      // transactions read the same count, both pass the check, and the account
+      // ends up with more codes than it bought.
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
   } catch (e) {
     if (e instanceof Error && e.message === "NO_SLOTS") {
       return { error: "That slot was just used on another device." };
+    }
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2034") {
+      return { error: "Another device was generating at the same moment. Please try again." };
     }
     throw e;
   }

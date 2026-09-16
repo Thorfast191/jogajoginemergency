@@ -1,7 +1,9 @@
 "use client";
 
-import { useActionState, useRef } from "react";
+import { useActionState, useRef, useState } from "react";
+import { useKeptForm } from "@/lib/use-kept-form";
 import { useTransition } from "react";
+import { MAX_IMAGE_BYTES, blockOversizeSubmit } from "@/lib/upload-limits";
 import {
   uploadProfilePhotoAction,
   deleteProfilePhotoAction,
@@ -14,6 +16,8 @@ export function PhotoControls({ photoAssetId }: { photoAssetId: string | null })
   const [state, formAction, pending] = useActionState(uploadProfilePhotoAction, initial);
   const [removing, startRemove] = useTransition();
   const fileRef = useRef<HTMLInputElement>(null);
+  const [tooBig, setTooBig] = useState<string | null>(null);
+  const [formRef, submitForm] = useKeptForm(formAction, state, true);
 
   return (
     <div className="flex items-start gap-4">
@@ -32,15 +36,23 @@ export function PhotoControls({ photoAssetId }: { photoAssetId: string | null })
         )}
       </div>
 
-      <div className="space-y-2">
-        <form action={formAction} className="flex items-center gap-2">
+      <div className="min-w-0 flex-1 space-y-2">
+        <form
+          ref={formRef}
+          action={formAction}
+          onSubmit={(e) => {
+            setTooBig(blockOversizeSubmit(e, MAX_IMAGE_BYTES));
+            submitForm(e);
+          }}
+          className="flex flex-wrap items-center gap-2"
+        >
           <input
             ref={fileRef}
             type="file"
             name="photo"
             accept="image/jpeg,image/png,image/webp"
             required
-            className="text-sm"
+            className="min-w-0 max-w-full text-sm"
           />
           <button
             type="submit"
@@ -65,8 +77,8 @@ export function PhotoControls({ photoAssetId }: { photoAssetId: string | null })
           </button>
         )}
 
-        {state.error && <p className="text-sm text-red-600">{state.error}</p>}
-        {state.success && <p className="text-sm text-emerald-600">Photo updated.</p>}
+        {(tooBig ?? state.error) && <p className="text-sm text-red-600">{tooBig ?? state.error}</p>}
+        {!tooBig && state.success && <p className="text-sm text-emerald-600">Photo updated.</p>}
         <p className="text-xs text-black/40">
           JPEG, PNG or WebP up to 5 MB. Shown publicly only if you enable it in Privacy.
         </p>

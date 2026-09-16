@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getStaffWith } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { settingsSchema } from "@/lib/validations";
+import { settingsSchema, firstIssue } from "@/lib/validations";
 import { getSettings, SETTINGS_ID, type PlatformSettings } from "@/lib/settings";
 import { availableGateways } from "@/lib/payments/registry";
 import { runMaintenance, type MaintenanceResult } from "@/lib/maintenance";
@@ -40,7 +40,7 @@ export async function saveSettingsAction(
     ordersPaused: formData.get("ordersPaused") ?? undefined,
     ordersPausedMessage: formData.get("ordersPausedMessage"),
   });
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  if (!parsed.success) return { error: firstIssue(parsed.error) };
 
   // The form lists the gateways this deployment has configured and ticks the
   // ones to offer. Only the unticked ones are stored — the setting can hide a

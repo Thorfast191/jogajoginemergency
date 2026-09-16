@@ -3,7 +3,7 @@ import { getStaffWith } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { can } from "@/lib/permissions";
 import { formatPrice } from "@/lib/money";
-import { printReadiness } from "@/lib/print";
+import { unfulfilledPrintQueue } from "@/lib/print-server";
 import { bucketWhere, entitledWhere } from "@/lib/subscription";
 import { dailyScanCounts } from "@/lib/daily-server";
 import { Forbidden } from "@/components/admin/forbidden";
@@ -40,7 +40,7 @@ export default async function AdminOverviewPage() {
     tags,
     newTags,
     ordersThisWeek,
-    unprinted,
+    printQueue,
     printing,
     openReports,
     daily,
@@ -55,19 +55,7 @@ export default async function AdminOverviewPage() {
     prisma.tag.count(),
     prisma.tag.count({ where: { createdAt: { gte: weekAgo } } }),
     prisma.order.count({ where: { placedAt: { gte: weekAgo } } }),
-    prisma.order.findMany({
-      where: { status: "PAID", fulfillmentStatus: "UNFULFILLED" },
-      select: {
-        items: {
-          select: {
-            quantity: true,
-            product: { select: { qrSlots: true } },
-            _count: { select: { tags: true } },
-          },
-        },
-      },
-      take: 200,
-    }),
+    unfulfilledPrintQueue(),
     prisma.order.count({ where: { status: "PAID", fulfillmentStatus: "PROCESSING" } }),
     prisma.abuseReport.count({ where: { status: "OPEN" } }),
     dailyScanCounts(30, at),
@@ -82,15 +70,7 @@ export default async function AdminOverviewPage() {
       : Promise.resolve(null),
   ]);
 
-  let waitingOnCustomer = 0;
-  let readyToPrint = 0;
-  for (const order of unprinted) {
-    const r = printReadiness(
-      order.items.map((i) => ({ quantity: i.quantity, qrSlots: i.product.qrSlots, tagsGenerated: i._count.tags })),
-    );
-    if (r.ready) readyToPrint++;
-    else waitingOnCustomer++;
-  }
+  const { ready: readyToPrint, waiting: waitingOnCustomer } = printQueue;
 
   const scans30 = daily.reduce((n, d) => n + d.count, 0);
 

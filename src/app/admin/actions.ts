@@ -3,10 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { getStaffWith, requirePermission } from "@/lib/session";
+import { getStaffWith } from "@/lib/session";
 import { can, isStaff } from "@/lib/permissions";
-import { canSetUserStatus, type Role } from "@/lib/admin-guards";
+import { canSetTagStatus, canSetUserStatus, type Role } from "@/lib/admin-guards";
 import { audit } from "@/lib/audit";
+import { firstIssue } from "@/lib/validations";
 
 export type AdminActionState = { error?: string; ok?: boolean };
 
@@ -20,16 +21,26 @@ type TagStatus = (typeof TAG_STATUSES)[number];
 
 // --- Users --------------------------------------------------------------
 
-/** Suspend or reactivate a customer. Destructive, so super admins only. */
-export async function setUserStatusAction(userId: string, status: "ACTIVE" | "SUSPENDED") {
-  const actor = await requirePermission("destructive");
-  if (status !== "ACTIVE" && status !== "SUSPENDED") throw new Error("Invalid status.");
+/**
+ * Suspend or reactivate a customer. Destructive, so super admins only.
+ *
+ * Returns the refusal rather than throwing: these are called from buttons, and
+ * a staff member whose role was narrowed mid-session should read a sentence,
+ * not trip an error overlay.
+ */
+export async function setUserStatusAction(
+  userId: string,
+  status: "ACTIVE" | "SUSPENDED",
+): Promise<AdminActionState> {
+  const actor = await getStaffWith("destructive");
+  if (!actor) return { error: "Only a super admin can suspend or reactivate an account." };
+  if (status !== "ACTIVE" && status !== "SUSPENDED") return { error: "Invalid status." };
 
   const target = await prisma.user.findUnique({
     where: { id: userId },
     select: { id: true, name: true, email: true, role: true, status: true },
   });
-  if (!target) throw new Error("User not found.");
+  if (!target) return { error: "User not found." };
 
   // Suspending an admin is a demotion in disguise, and suspending yourself
   // locks you out of the console. Both go through /admin/admins instead.
@@ -38,8 +49,8 @@ export async function setUserStatusAction(userId: string, status: "ACTIVE" | "SU
     targetId: target.id,
     targetRole: target.role as Role,
   });
-  if (!guard.ok) throw new Error(guard.reason);
-  if (target.status === status) return;
+  if (!guard.ok) return { error: guard.reason };
+  if (target.status === status) return { ok: true };
 
   await prisma.user.update({ where: { id: target.id }, data: { status } });
   await audit(
@@ -50,6 +61,7 @@ export async function setUserStatusAction(userId: string, status: "ACTIVE" | "SU
   );
   revalidatePath("/admin/users");
   revalidatePath(`/admin/users/${target.id}`);
+  return { ok: true };
 }
 
 /**
@@ -70,7 +82,7 @@ export async function updateCustomerIdentityAction(
     name: formData.get("name"),
     email: formData.get("email"),
   });
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  if (!parsed.success) return { error: firstIssue(parsed.error) };
 
   const target = await prisma.user.findUnique({
     where: { id: userId },
@@ -109,45 +121,66 @@ export async function setTagStatusAction(tagId: string, status: TagStatus): Prom
 
   const tag = await prisma.tag.findUnique({
     where: { id: tagId },
-    select: { id: true, shortCode: true, status: true },
+    select: { id: true, shortCode: true, status: true, takenDownAt: true },
   });
   if (!tag) return { error: "Tag not found." };
-  if (tag.status === status) return { ok: true };
 
-  const takedown = status === "DEACTIVATED" || tag.status === "DEACTIVATED";
-  if (takedown && !can(actor.role, "destructive")) {
-    return { error: "Only a super admin can deactivate a QR code or undo a takedown." };
-  }
+  const takenDown = tag.takenDownAt !== null;
+  // Already in that state — except that taking down a code its owner had
+  // switched off is a real change: it stops them switching it back on.
+  if (tag.status === status && (status !== "DEACTIVATED" || takenDown)) return { ok: true };
 
-  await prisma.tag.update({ where: { id: tag.id }, data: { status } });
-  if (takedown) {
+  const verdict = canSetTagStatus({
+    by: "staff",
+    mayTakeDown: can(actor.role, "destructive"),
+    current: tag.status,
+    takenDown,
+    next: status,
+  });
+  if (!verdict.ok) return { error: verdict.reason };
+
+  await prisma.tag.update({
+    where: { id: tag.id },
+    data: { status, takenDownAt: verdict.takenDown ? new Date() : null },
+  });
+  if (verdict.takenDown !== takenDown) {
     await audit(
       actor.id,
-      status === "DEACTIVATED" ? "tag.deactivate" : "tag.reactivate",
+      verdict.takenDown ? "tag.deactivate" : "tag.reactivate",
       { type: "tag", id: tag.id },
-      status === "DEACTIVATED"
-        ? `Deactivated /t/${tag.shortCode}`
-        : `Reactivated /t/${tag.shortCode} (now ${status.toLowerCase()})`,
+      verdict.takenDown
+        ? `Took down /t/${tag.shortCode}`
+        : `Lifted the takedown on /t/${tag.shortCode} (now ${status.toLowerCase()})`,
     );
   }
 
   revalidatePath("/admin/tags");
   revalidatePath(`/admin/tags/${tag.id}`);
   revalidatePath("/admin");
+  revalidatePath(`/dashboard/tags/${tag.id}`);
+  revalidatePath("/dashboard/tags");
   return { ok: true };
 }
 
 // --- Abuse reports --------------------------------------------------
 
+const REPORT_STATUSES = ["OPEN", "REVIEWING", "RESOLVED", "DISMISSED"] as const;
+
+/** Move a report along — or back to OPEN, when one was closed by mistake. */
 export async function resolveAbuseReportAction(
   reportId: string,
-  status: "REVIEWING" | "RESOLVED" | "DISMISSED",
-) {
-  await requirePermission("console.view");
-  if (!["REVIEWING", "RESOLVED", "DISMISSED"].includes(status)) throw new Error("Invalid status.");
+  status: (typeof REPORT_STATUSES)[number],
+): Promise<AdminActionState> {
+  if (!(await getStaffWith("console.view"))) return { error: "Not authorized." };
+  if (!REPORT_STATUSES.includes(status)) return { error: "Invalid status." };
+
+  const report = await prisma.abuseReport.findUnique({ where: { id: reportId }, select: { id: true } });
+  if (!report) return { error: "That report no longer exists." };
+
   await prisma.abuseReport.update({
     where: { id: reportId },
     data: { status, resolvedAt: status === "RESOLVED" || status === "DISMISSED" ? new Date() : null },
   });
   revalidatePath("/admin/abuse-reports");
+  return { ok: true };
 }

@@ -10,10 +10,12 @@ type Status = (typeof statuses)[number];
 function Select({
   tagId,
   status,
+  takenDown,
   canDeactivate,
 }: {
   tagId: string;
   status: string;
+  takenDown: boolean;
   canDeactivate: boolean;
 }) {
   const [pending, startTransition] = useTransition();
@@ -21,10 +23,15 @@ function Select({
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
-  // A takedown is a super admin's call, and so is undoing one. A regular admin
-  // sees the state but has nothing to change it to.
+  // A code its owner switched off is theirs to switch on; a takedown is a
+  // super admin's call, and so is lifting one. Either way a regular admin sees
+  // the state with nothing to change it to, and taking down an owner-disabled
+  // code happens on its detail page.
+  if (status === "DEACTIVATED" && !takenDown) {
+    return <span className="text-xs font-medium text-black/60">OFF (by owner)</span>;
+  }
   if (status === "DEACTIVATED" && !canDeactivate) {
-    return <span className="text-xs font-medium text-red-700">DEACTIVATED</span>;
+    return <span className="text-xs font-medium text-red-700">TAKEN DOWN</span>;
   }
   const options = canDeactivate ? statuses : statuses.filter((s) => s !== "DEACTIVATED");
 
@@ -64,13 +71,23 @@ function Select({
 export function TagStatusSelect({
   tagId,
   status,
+  takenDown,
   canDeactivate,
 }: {
   tagId: string;
   status: string;
+  takenDown: boolean;
   canDeactivate: boolean;
 }) {
   // Remount when the server-provided status changes so the control never
   // shows a stale value after a refresh.
-  return <Select key={status} tagId={tagId} status={status} canDeactivate={canDeactivate} />;
+  return (
+    <Select
+      key={`${status}:${takenDown}`}
+      tagId={tagId}
+      status={status}
+      takenDown={takenDown}
+      canDeactivate={canDeactivate}
+    />
+  );
 }

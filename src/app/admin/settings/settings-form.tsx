@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState, useTransition } from "react";
+import { useKeptForm } from "@/lib/use-kept-form";
 import type { PlatformSettings } from "@/lib/settings";
 import type { MaintenanceResult } from "@/lib/maintenance";
 import { runMaintenanceAction, saveSettingsAction, type SettingsState } from "./actions";
@@ -26,10 +27,11 @@ export function SettingsForm({
   gateways: { id: string; label: string }[];
 }) {
   const [state, action, pending] = useActionState(saveSettingsAction, initial);
+  const [formRef, submitForm] = useKeptForm(action, state);
   const [paused, setPaused] = useState(settings.ordersPaused);
 
   return (
-    <form action={action} className="space-y-5">
+    <form ref={formRef} action={action} onSubmit={submitForm} className="space-y-5">
       <Section title="Contact details" hint="Shown in the site footer and on the Contact page.">
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="text-sm">

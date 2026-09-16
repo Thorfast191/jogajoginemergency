@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { useKeptForm } from "@/lib/use-kept-form";
 import { createPlanAction, updatePlanAction, type PlanState } from "./actions";
 
 const initial: PlanState = {};
@@ -20,9 +21,10 @@ const field = "mt-1 w-full rounded-lg border border-black/15 bg-white px-3 py-2 
 export function PlanForm({ plan, canPrice }: { plan?: Plan; canPrice: boolean }) {
   const action = plan ? updatePlanAction.bind(null, plan.id) : createPlanAction;
   const [state, formAction, pending] = useActionState<PlanState, FormData>(action, initial);
+  const [formRef, submitForm] = useKeptForm(formAction, state, !plan);
 
   return (
-    <form action={formAction} className="space-y-3">
+    <form ref={formRef} action={formAction} onSubmit={submitForm} className="space-y-3">
       <div className="grid gap-3 sm:grid-cols-2">
         {plan ? (
           <p className="text-sm">

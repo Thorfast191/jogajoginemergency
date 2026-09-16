@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getStaffWith } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { can } from "@/lib/permissions";
-import { planSchema, planTextSchema } from "@/lib/validations";
+import { planSchema, planTextSchema, firstIssue } from "@/lib/validations";
 import { formatPrice } from "@/lib/money";
 import { intervalLabel } from "@/lib/subscription-periods";
 import { audit } from "@/lib/audit";
@@ -15,10 +15,6 @@ function revalidate() {
   revalidatePath("/admin/plans");
   revalidatePath("/dashboard/subscription");
   revalidatePath("/");
-}
-
-function firstIssue(error: { issues: { message: string }[] }): string {
-  return error.issues[0]?.message ?? "Invalid input";
 }
 
 /** A new plan has a price, so creating one is a pricing decision. */

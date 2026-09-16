@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { abuseReportSchema } from "@/lib/validations";
+import { abuseReportSchema, firstIssue } from "@/lib/validations";
 import { getClientIp } from "@/lib/client-ip";
 import { rateLimit } from "@/lib/rate-limit";
 
@@ -14,7 +14,7 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
   const parsed = abuseReportSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid input" }, { status: 400 });
+    return NextResponse.json({ error: firstIssue(parsed.error) }, { status: 400 });
   }
 
   let tagId: string | undefined;

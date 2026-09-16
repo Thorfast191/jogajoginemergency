@@ -14,7 +14,14 @@ import { generateShortCode } from "@/lib/short-code";
  */
 export async function createTag(
   tx: Prisma.TransactionClient,
-  data: { userId: string; productId?: string | null; orderItemId?: string | null; themeId?: string | null },
+  data: {
+    userId: string;
+    productId?: string | null;
+    orderItemId?: string | null;
+    themeId?: string | null;
+    /** A support replacement: printed, but not charged to a purchased slot. */
+    isReplacement?: boolean;
+  },
 ): Promise<{ id: string; shortCode: string }> {
   for (let attempt = 0; attempt < 5; attempt++) {
     const shortCode = generateShortCode();
@@ -27,6 +34,7 @@ export async function createTag(
         productId: data.productId ?? null,
         orderItemId: data.orderItemId ?? null,
         themeId: data.themeId ?? null,
+        isReplacement: data.isReplacement ?? false,
       },
       select: { id: true, shortCode: true },
     });

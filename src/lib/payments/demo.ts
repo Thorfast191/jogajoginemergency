@@ -4,18 +4,18 @@ import type { PaymentGateway } from "./types";
  * A gateway that takes no money.
  *
  * It exists so the app is developable without merchant credentials, and it is
- * refused outright in live mode by `demoEnabled()`. The redirect goes straight
- * back to our own callback, so the settlement path under test is the same one
- * the real providers use.
+ * refused outright in live mode by `demoEnabled()`. Like a real provider it
+ * sends the customer to a payment page (src/app/checkout/demo), whose buttons
+ * return the browser to our own callback — so the settlement path under test
+ * is the same one the real providers use.
  */
 export const demoGateway: PaymentGateway = {
   id: "DEMO",
   label: "Demo (no real payment)",
 
   async initiate(intent) {
-    const url = new URL(intent.callbackUrl);
+    const url = new URL("/checkout/demo", intent.callbackUrl);
     url.searchParams.set("payment", intent.paymentId);
-    url.searchParams.set("demo", "success");
     return { redirectUrl: url.toString(), gatewayPaymentId: `demo_${intent.paymentId}` };
   },
 

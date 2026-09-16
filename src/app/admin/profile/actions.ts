@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getAdmin } from "@/lib/session";
 import { changeOwnIdentity, changeOwnPassword } from "@/lib/account";
+import { firstIssue } from "@/lib/validations";
 
 export type AdminProfileState = { error?: string; success?: boolean };
 
@@ -29,7 +30,7 @@ export async function updateAdminIdentityAction(
     name: formData.get("name"),
     email: formData.get("email"),
   });
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  if (!parsed.success) return { error: firstIssue(parsed.error) };
 
   const result = await changeOwnIdentity(admin.id, parsed.data.name, parsed.data.email);
   if (!result.ok) return { error: result.error };
@@ -56,7 +57,7 @@ export async function updateAdminPasswordAction(
     currentPassword: formData.get("currentPassword"),
     newPassword: formData.get("newPassword"),
   });
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  if (!parsed.success) return { error: firstIssue(parsed.error) };
 
   const result = await changeOwnPassword(
     admin.id,

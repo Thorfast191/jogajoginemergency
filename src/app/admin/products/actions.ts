@@ -2,18 +2,29 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getStaffWith, requirePermission } from "@/lib/session";
+import { getStaffWith } from "@/lib/session";
+import { MAX_IMAGE_BYTES, oversizeMessage } from "@/lib/upload-limits";
 import { prisma } from "@/lib/prisma";
 import { can } from "@/lib/permissions";
-import { productSchema } from "@/lib/validations";
+import { productSchema, firstIssue } from "@/lib/validations";
 import { processImage, MediaError } from "@/lib/media";
 import { formatPrice } from "@/lib/money";
 import { audit } from "@/lib/audit";
 
 export type ProductState = { error?: string; success?: boolean };
 
-/** The fields only `pricing.manage` may set: what a product costs and what it grants. */
-type Pricing = { priceCents: number; currency: string; qrSlots: number; status: string };
+/**
+ * The fields only `pricing.manage` may set: what a product costs, what it
+ * grants, whether customers can see it — and which theme it carries, because
+ * buying a product is what unlocks that theme for the customer.
+ */
+type Pricing = {
+  priceCents: number;
+  currency: string;
+  qrSlots: number;
+  status: string;
+  themeId: string | null;
+};
 
 function parse(formData: FormData, keep?: Pricing) {
   return productSchema.safeParse({
@@ -26,7 +37,7 @@ function parse(formData: FormData, keep?: Pricing) {
     currency: keep ? keep.currency : formData.get("currency") || "BDT",
     qrSlots: keep ? keep.qrSlots : formData.get("qrSlots") || 1,
     stickerWidthMm: formData.get("stickerWidthMm") || 60,
-    themeId: formData.get("themeId") || null,
+    themeId: keep ? keep.themeId : formData.get("themeId") || null,
     status: keep ? keep.status : formData.get("status"),
     sortOrder: formData.get("sortOrder") || 0,
   });
@@ -37,6 +48,13 @@ function revalidate() {
   revalidatePath("/shop");
 }
 
+/** A themeId posted by hand must name a real theme, or the write raises a foreign-key error. */
+async function themeMissing(themeId: string | null | undefined): Promise<boolean> {
+  if (!themeId) return false;
+  const theme = await prisma.theme.findUnique({ where: { id: themeId }, select: { id: true } });
+  return !theme;
+}
+
 /** A new product needs a price and QR slots, so creating one is a pricing decision. */
 export async function createProductAction(
   _prev: ProductState,
@@ -45,10 +63,11 @@ export async function createProductAction(
   const actor = await getStaffWith("pricing.manage");
   if (!actor) return { error: "Only a super admin can create products." };
   const parsed = parse(formData);
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  if (!parsed.success) return { error: firstIssue(parsed.error) };
 
   const clash = await prisma.product.findUnique({ where: { slug: parsed.data.slug } });
   if (clash) return { error: "A product with that slug already exists." };
+  if (await themeMissing(parsed.data.themeId)) return { error: "Choose a theme that exists." };
 
   // An image may come with the very first save, so a new product need not be
   // created blank and then edited just to give it a picture.
@@ -78,7 +97,7 @@ export async function createProductAction(
  * same re-encoding — an uploaded file is never stored as it arrived.
  */
 async function storeProductImage(file: File): Promise<{ id: string } | { error: string }> {
-  if (file.size > 5 * 1024 * 1024) return { error: "Image is larger than 5 MB." };
+  if (file.size > MAX_IMAGE_BYTES) return { error: oversizeMessage(MAX_IMAGE_BYTES) };
 
   let processed;
   try {
@@ -123,13 +142,14 @@ export async function updateProductAction(
 
   const pricer = can(actor.role, "pricing.manage");
   const parsed = parse(formData, pricer ? undefined : existing);
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  if (!parsed.success) return { error: firstIssue(parsed.error) };
 
   const clash = await prisma.product.findFirst({
     where: { slug: parsed.data.slug, NOT: { id } },
     select: { id: true },
   });
   if (clash) return { error: "Another product already uses that slug." };
+  if (await themeMissing(parsed.data.themeId)) return { error: "Choose a theme that exists." };
 
   await prisma.product.update({ where: { id }, data: parsed.data });
 
@@ -156,16 +176,18 @@ export async function updateProductAction(
   return { success: true };
 }
 
-export async function archiveProductAction(id: string) {
-  const actor = await requirePermission("destructive");
-  const product = await prisma.product.update({
-    where: { id },
-    data: { status: "ARCHIVED" },
-    select: { name: true },
-  });
+export async function archiveProductAction(id: string): Promise<ProductState> {
+  const actor = await getStaffWith("destructive");
+  if (!actor) return { error: "Only a super admin can archive a product." };
+
+  const product = await prisma.product.findUnique({ where: { id }, select: { name: true } });
+  if (!product) return { error: "Product not found." };
+
+  await prisma.product.update({ where: { id }, data: { status: "ARCHIVED" } });
   await audit(actor.id, "product.archive", { type: "product", id }, `Archived ${product.name}`);
   revalidate();
   revalidatePath(`/admin/products/${id}`);
+  return { success: true };
 }
 
 export async function uploadProductImageAction(

@@ -66,6 +66,26 @@ describe("renderSticker", () => {
   });
 });
 
+describe("defaultArtworkSvg — long and punctuated taglines", () => {
+  // A tagline within the 140-character limit that wraps and truncates. Escaping
+  // before truncating could slice "&apos;" in half and make librsvg reject the
+  // whole document, so every sticker for the theme would fail to render.
+  const long =
+    "Please scan this QR if it's an emergency and you can't reach me — my sister's number is on the card, & the hospital's details follow";
+
+  it("still produces a renderable sticker", async () => {
+    const sticker = await renderSticker({ art: null, theme: { ...theme, tagline: long }, url, maxEdge: 900 });
+    expect(sticker.width).toBe(900);
+    expect(await decodeBox(sticker.png, 900, 900, theme.qrBoxSize)).toBe(url);
+  });
+
+  it("never leaves a half-written entity in the markup", () => {
+    const svg = defaultArtworkSvg({ ...theme, tagline: long }, 900);
+    // Every & must start a complete entity.
+    expect(svg.match(/&(?!(amp|lt|gt|quot|apos|#\d+);)/g)).toBeNull();
+  });
+});
+
 describe("defaultArtworkSvg", () => {
   it("escapes theme text, which admins type and the SVG renderer parses", () => {
     const svg = defaultArtworkSvg({ ...theme, tagline: `<script>alert("x")</script> & co` }, 800);

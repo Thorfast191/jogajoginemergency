@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { useKeptForm } from "@/lib/use-kept-form";
 import { promoteAction, setRoleAction, type AdminsState } from "./actions";
 
 const initial: AdminsState = {};
@@ -9,9 +10,10 @@ const field = "rounded-lg border border-black/15 bg-white px-3 py-2 text-sm";
 
 export function PromoteAdminForm() {
   const [state, action, pending] = useActionState<AdminsState, FormData>(promoteAction, initial);
+  const [formRef, submitForm] = useKeptForm(action, state, true);
 
   return (
-    <form action={action} className="max-w-xl">
+    <form ref={formRef} action={action} onSubmit={submitForm} className="max-w-xl">
       <div className="flex flex-wrap gap-2">
         <label className="sr-only" htmlFor="promote-email">
           Account email
@@ -57,13 +59,14 @@ export function RoleControl({
   isSelf: boolean;
 }) {
   const [state, action, pending] = useActionState<AdminsState, FormData>(setRoleAction, initial);
+  const [formRef, submitForm] = useKeptForm(action, state);
 
   if (isSelf) {
     return <span className="text-xs text-black/40">That&apos;s you</span>;
   }
 
   return (
-    <form action={action} className="flex flex-col items-end gap-1">
+    <form ref={formRef} action={action} onSubmit={submitForm} className="flex flex-col items-end gap-1">
       <input type="hidden" name="userId" value={userId} />
       <div className="flex gap-2">
         <select name="role" defaultValue={role} className={`${field} py-1.5 text-xs`} aria-label="Role">

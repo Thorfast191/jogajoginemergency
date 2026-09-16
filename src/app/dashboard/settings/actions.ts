@@ -5,6 +5,7 @@ import { getCustomer, requireCustomer } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 import { changeOwnPassword } from "@/lib/account";
+import { firstIssue } from "@/lib/validations";
 
 const profileSchema = z.object({
   name: z.string().min(2).max(100),
@@ -24,7 +25,7 @@ export async function updateProfileAction(
     name: formData.get("name"),
     phone: formData.get("phone"),
   });
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  if (!parsed.success) return { error: firstIssue(parsed.error) };
 
   await prisma.user.update({
     where: { id: authedUser.id },
@@ -53,7 +54,7 @@ export async function updatePasswordAction(
     currentPassword: formData.get("currentPassword"),
     newPassword: formData.get("newPassword"),
   });
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  if (!parsed.success) return { error: firstIssue(parsed.error) };
 
   // Shared with the admin profile page. Stamps passwordChangedAt, so changing
   // your password signs out every other device rather than only this one.

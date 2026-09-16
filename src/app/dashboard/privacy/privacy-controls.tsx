@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { updatePrivacyAction, type PrivacyInput } from "./actions";
 import type { VisibilityFlags } from "@/lib/privacy";
 
@@ -30,9 +31,12 @@ const ORDER: (keyof VisibilityFlags)[] = [
 export function PrivacyControls({
   flags,
   preset,
+  phoneShowable,
 }: {
   flags: VisibilityFlags;
   preset: string;
+  /** Click-to-call is on and a number is saved — without both, the switch alone shows nothing. */
+  phoneShowable: boolean;
 }) {
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -69,8 +73,19 @@ export function PrivacyControls({
 
       <ul className="mt-4 divide-y divide-black/10 rounded-lg border border-black/10">
         {ORDER.map((field) => (
-          <li key={field} className="flex items-center justify-between px-3 py-2.5 text-sm">
-            <span>{FIELD_LABELS[field]}</span>
+          <li key={field} className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm">
+            <span>
+              {FIELD_LABELS[field]}
+              {field === "showPhone" && flags.showPhone && !phoneShowable && (
+                <span className="mt-0.5 block text-xs text-amber-700">
+                  Not shown yet: choose click-to-call and add a public number in{" "}
+                  <Link href="/dashboard/profile" className="underline">
+                    My Profile
+                  </Link>
+                  .
+                </span>
+              )}
+            </span>
             <label className="inline-flex items-center gap-2">
               <span className="text-xs text-black/50">{flags[field] ? "Public" : "Private"}</span>
               <input

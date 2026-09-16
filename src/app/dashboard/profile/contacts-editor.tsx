@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState, useTransition } from "react";
+import { useKeptForm } from "@/lib/use-kept-form";
 import {
   addContactAction,
   updateContactAction,
@@ -79,12 +80,22 @@ function Row({
     updateContactAction.bind(null, contact.id),
     initial,
   );
+  const [formRef, submitForm] = useKeptForm(formAction, state);
   const [busy, start] = useTransition();
+
+  // Close the editor once a save goes through; otherwise it sat open with no
+  // sign the change had been kept. Adjusted during render, React's pattern for
+  // state that follows another value.
+  const [seen, setSeen] = useState(state);
+  if (state !== seen) {
+    setSeen(state);
+    if (state.success) setEditing(false);
+  }
 
   if (editing) {
     return (
       <li className="rounded-lg border border-black/10 p-3">
-        <form action={formAction} className="space-y-2">
+        <form ref={formRef} action={formAction} onSubmit={submitForm} className="space-y-2">
           <Fields c={contact} />
           {state.error && <p className="text-sm text-red-600">{state.error}</p>}
           <div className="flex gap-2">
@@ -154,6 +165,7 @@ function Row({
 export function ContactsEditor({ contacts }: { contacts: Contact[] }) {
   const ids = contacts.map((c) => c.id);
   const [state, formAction, pending] = useActionState(addContactAction, initial);
+  const [formRef, submitForm] = useKeptForm(formAction, state, true);
 
   return (
     <div className="space-y-3">
@@ -167,7 +179,9 @@ export function ContactsEditor({ contacts }: { contacts: Contact[] }) {
 
       {contacts.length < MAX ? (
         <form
+          ref={formRef}
           action={formAction}
+          onSubmit={submitForm}
           className="rounded-lg border border-dashed border-black/20 p-3 space-y-2"
         >
           <p className="text-sm font-medium">Add an emergency contact</p>

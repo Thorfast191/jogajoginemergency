@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { useActionState } from "react";
+import { useKeptForm } from "@/lib/use-kept-form";
 import { generateTagAction, type GenerateState } from "./actions";
 
 const initial: GenerateState = {};
 
 export function GenerateTagForm({ available, owned }: { available: number; owned: number }) {
   const [state, formAction, pending] = useActionState(generateTagAction, initial);
+  const [formRef, submitForm] = useKeptForm(formAction, state);
 
   if (owned === 0) {
     return (
@@ -41,7 +43,7 @@ export function GenerateTagForm({ available, owned }: { available: number; owned
   }
 
   return (
-    <form action={formAction} className="rounded-2xl border border-black/10 bg-white p-5">
+    <form ref={formRef} action={formAction} onSubmit={submitForm} className="rounded-2xl border border-black/10 bg-white p-5">
       <p className="text-sm font-semibold">
         Generate a QR code{" "}
         <span className="font-normal text-black/50">

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useActionState, useTransition } from "react";
+import { useKeptForm } from "@/lib/use-kept-form";
 import { updateBioAction, addLinkAction, deleteLinkAction, type LinkState } from "./actions";
 
 const initial: LinkState = {};
@@ -27,7 +28,9 @@ export function PortfolioEditor({
   entitled: boolean;
 }) {
   const [bioState, bioAction, bioPending] = useActionState(updateBioAction, initial);
+  const [bioFormRef, submitBio] = useKeptForm(bioAction, bioState);
   const [linkState, linkAction, linkPending] = useActionState(addLinkAction, initial);
+  const [linkFormRef, submitLink] = useKeptForm(linkAction, linkState, true);
   const [busy, start] = useTransition();
 
   return (
@@ -41,7 +44,7 @@ export function PortfolioEditor({
         </p>
       )}
 
-      <form action={bioAction} className="space-y-2">
+      <form ref={bioFormRef} action={bioAction} onSubmit={submitBio} className="space-y-2">
         <label htmlFor="bio" className="block text-sm font-semibold">
           Short bio
         </label>
@@ -91,7 +94,7 @@ export function PortfolioEditor({
       )}
 
       {links.length < MAX ? (
-        <form action={linkAction} className="space-y-2 rounded-xl border border-dashed border-black/20 p-3">
+        <form ref={linkFormRef} action={linkAction} onSubmit={submitLink} className="space-y-2 rounded-xl border border-dashed border-black/20 p-3">
           <p className="text-sm font-semibold">Add a link</p>
           <div className="grid gap-2 sm:grid-cols-2">
             <input name="label" required placeholder="Instagram" className={inputClass} />

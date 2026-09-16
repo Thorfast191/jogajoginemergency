@@ -54,7 +54,14 @@ function printable(text: string): string {
   return text.replace(/\p{Extended_Pictographic}|️/gu, "").replace(/\s+/g, " ").trim();
 }
 
-/** Greedy word wrap into at most `maxLines`, with an ellipsis if it overflows. */
+/**
+ * Greedy word wrap into at most `maxLines`, with an ellipsis if it overflows.
+ *
+ * Takes plain text. Escaping has to happen *after* this, because truncating an
+ * already-escaped string can cut an entity in half ("&apos" with no
+ * semicolon) — which is not well-formed XML, so librsvg refuses the whole
+ * document and every sticker for that theme fails to render.
+ */
 function wrap(text: string, maxChars: number, maxLines: number): string[] {
   const lines: string[] = [];
   let current = "";
@@ -102,7 +109,7 @@ export function defaultArtworkSvg(theme: StickerTheme, size: number): string {
 
   const tagSize = Math.max(9, Math.round(Math.min(size * 0.036, band * 0.2)));
   const maxChars = Math.max(12, Math.floor((size * 0.84) / (tagSize * 0.55)));
-  const tagLines = wrap(escapeXml(printable(theme.tagline)), maxChars, 2);
+  const tagLines = wrap(printable(theme.tagline), maxChars, 2).map(escapeXml);
   const tagTop = box.top + box.size + Math.round(band * 0.5 - (tagLines.length * tagSize * 1.25) / 2);
 
   const cx = size / 2;

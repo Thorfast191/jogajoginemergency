@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { useKeptForm } from "@/lib/use-kept-form";
 import { createOrderAction, type CheckoutState } from "./actions";
 
 const initial: CheckoutState = {};
@@ -18,10 +19,11 @@ export function CheckoutForm({
   methods: Method[];
 }) {
   const [state, formAction, pending] = useActionState(createOrderAction, initial);
+  const [formRef, submitForm] = useKeptForm(formAction, state);
   const [provider, setProvider] = useState(methods[0]?.id ?? "");
 
   return (
-    <form action={formAction} className="space-y-6">
+    <form ref={formRef} action={formAction} onSubmit={submitForm} className="space-y-6">
       <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
 
       <fieldset className="rounded-2xl border border-black/10 bg-white p-4">

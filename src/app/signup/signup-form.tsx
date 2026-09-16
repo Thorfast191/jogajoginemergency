@@ -1,15 +1,17 @@
 "use client";
 
 import { useActionState } from "react";
+import { useKeptForm } from "@/lib/use-kept-form";
 import { signupAction, type SignupState } from "./actions";
 
 const initialState: SignupState = {};
 
 export function SignupForm({ next }: { next?: string }) {
   const [state, formAction, pending] = useActionState(signupAction, initialState);
+  const [formRef, submitForm] = useKeptForm(formAction, state);
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form ref={formRef} action={formAction} onSubmit={submitForm} className="space-y-4">
       {next && <input type="hidden" name="next" value={next} />}
       <div>
         <label className="block text-sm font-medium mb-1" htmlFor="name">

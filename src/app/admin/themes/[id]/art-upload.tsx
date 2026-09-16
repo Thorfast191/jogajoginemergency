@@ -1,6 +1,8 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
+import { useKeptForm } from "@/lib/use-kept-form";
+import { MAX_THEME_ART_BYTES, blockOversizeSubmit } from "@/lib/upload-limits";
 import { uploadThemeArtAction, type ThemeState } from "../actions";
 
 const initial: ThemeState = {};
@@ -19,6 +21,8 @@ export function ThemeArtUpload({
     uploadThemeArtAction.bind(null, themeId),
     initial,
   );
+  const [tooBig, setTooBig] = useState<string | null>(null);
+  const [formRef, submitForm] = useKeptForm(formAction, state, true);
 
   return (
     <div className="max-w-sm">
@@ -37,7 +41,15 @@ export function ThemeArtUpload({
         </p>
       )}
 
-      <form action={formAction} className="mt-4 flex flex-wrap items-center gap-2">
+      <form
+        ref={formRef}
+        action={formAction}
+        onSubmit={(e) => {
+          setTooBig(blockOversizeSubmit(e, MAX_THEME_ART_BYTES));
+          submitForm(e);
+        }}
+        className="mt-4 flex flex-wrap items-center gap-2"
+      >
         <label htmlFor="art" className="sr-only">
           Sticker artwork
         </label>
@@ -57,8 +69,8 @@ export function ThemeArtUpload({
           {pending ? "Uploading…" : artAssetId ? "Replace" : "Upload"}
         </button>
       </form>
-      {state.error && <p className="mt-2 text-sm text-red-600">{state.error}</p>}
-      {state.success && (
+      {(tooBig ?? state.error) && <p className="mt-2 text-sm text-red-600">{tooBig ?? state.error}</p>}
+      {!tooBig && state.success && (
         <p className="mt-2 text-sm text-[var(--color-primary-dark)]">Artwork updated.</p>
       )}
       <p className="mt-2 text-xs text-black/40">

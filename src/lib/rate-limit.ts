@@ -15,16 +15,32 @@
 export type LimitOptions = { limit: number; windowMs: number };
 export type LimitResult = { allowed: boolean; remaining: number };
 
-type Bucket = { timestamps: number[] };
+// A bucket remembers its own window, so the sweep never drops one early.
+type Bucket = { timestamps: number[]; windowMs: number };
 
-const buckets = new Map<string, Bucket>();
+// Held on globalThis, as the Prisma client is. Next.js bundles route handlers
+// and pages/server actions as separate module layers, each with its own copy
+// of this file: a plain module-level Map gave Auth.js's sign-in endpoint and
+// the login form two separate budgets for the same account.
+const shared = globalThis as unknown as {
+  __rateLimitBuckets?: Map<string, Bucket>;
+  __rateLimitSweep?: ReturnType<typeof setInterval>;
+};
+const buckets = (shared.__rateLimitBuckets ??= new Map<string, Bucket>());
 
-setInterval(() => {
-  const cutoff = Date.now() - 10 * 60 * 1000;
-  for (const [key, bucket] of buckets) {
-    if (bucket.timestamps.every((t) => t < cutoff)) buckets.delete(key);
-  }
-}, 5 * 60 * 1000).unref?.();
+shared.__rateLimitSweep ??= (() => {
+  // Once every hit in a bucket has aged out of that bucket's window, it holds
+  // nothing. (A fixed ten-minute cut-off here used to reset the hour-long
+  // sign-up limit and the day-long reminder limit early.)
+  const timer = setInterval(() => {
+    const now = Date.now();
+    for (const [key, bucket] of buckets) {
+      if (bucket.timestamps.every((t) => now - t >= bucket.windowMs)) buckets.delete(key);
+    }
+  }, 5 * 60 * 1000);
+  timer.unref?.();
+  return timer;
+})();
 
 function usingPostgres(): boolean {
   return process.env.RATE_LIMIT_STORE === "postgres";
@@ -38,7 +54,8 @@ async function db() {
 
 /** Drop hits that have aged out of the window, and return the live bucket. */
 function live(key: string, windowMs: number, now: number): Bucket {
-  const bucket = buckets.get(key) ?? { timestamps: [] };
+  const bucket = buckets.get(key) ?? { timestamps: [], windowMs };
+  bucket.windowMs = Math.max(bucket.windowMs, windowMs);
   bucket.timestamps = bucket.timestamps.filter((t) => now - t < windowMs);
   buckets.set(key, bucket);
   return bucket;

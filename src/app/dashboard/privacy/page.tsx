@@ -7,7 +7,7 @@ import { userIsEntitled } from "@/lib/subscription";
 import { PortfolioVisibility } from "./portfolio-visibility";
 import { FLAG_NAMES, type VisibilityFlags } from "@/lib/privacy";
 import { PublicProfileCard } from "@/components/public-profile-card";
-import { ensureProfile } from "@/app/dashboard/profile/actions";
+import { ensureProfile } from "@/lib/profile";
 import { PrivacyControls } from "./privacy-controls";
 
 export const dynamic = "force-dynamic";
@@ -50,7 +50,11 @@ export default async function PrivacyPage() {
 
       <div className="mt-6 grid lg:grid-cols-2 gap-8">
         <div>
-          <PrivacyControls flags={flags} preset={profile.visibilityPreset} />
+          <PrivacyControls
+            flags={flags}
+            preset={profile.visibilityPreset}
+            phoneShowable={profile.contactMode === "DIRECT_CALL" && Boolean(profile.phonePublic)}
+          />
           <PortfolioVisibility
             bioPublic={profile.bioPublic}
             linksPublic={profile.linksPublic}
@@ -66,7 +70,7 @@ export default async function PrivacyPage() {
             <p className="text-center text-xs font-medium text-emerald-600 mb-4">
               JOGAJOG EMERGENCY
             </p>
-            <PublicProfileCard view={view} shortCode="preview" />
+            <PublicProfileCard view={view} shortCode="preview" demo />
           </div>
         </div>
       </div>

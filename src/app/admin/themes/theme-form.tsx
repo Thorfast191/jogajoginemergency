@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { useKeptForm } from "@/lib/use-kept-form";
 import { createThemeAction, updateThemeAction, type ThemeState } from "./actions";
 import { MASCOTS } from "@/lib/themes";
 import { QR_BOX_DEFAULT } from "@/lib/sticker-layout";
@@ -43,9 +44,10 @@ export function ThemeForm({ theme }: { theme?: Theme }) {
     theme ? updateThemeAction.bind(null, theme.id) : createThemeAction,
     initial,
   );
+  const [formRef, submitForm] = useKeptForm(formAction, state);
 
   return (
-    <form action={formAction} className="max-w-2xl space-y-4">
+    <form ref={formRef} action={formAction} onSubmit={submitForm} className="max-w-2xl space-y-4">
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block">
           <span className="mb-1 block text-xs font-medium">Slug</span>
