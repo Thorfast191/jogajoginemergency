@@ -30,7 +30,13 @@ export default async function AdminSubscriptionDetailPage({
     include: {
       user: { select: { id: true, name: true, email: true } },
       plan: true,
-      payments: { orderBy: { createdAt: "desc" }, take: 50 },
+      // Includes the payment for an order that carried this plan — one payment
+      // bought both, and settlement links it here too.
+      payments: {
+        orderBy: { createdAt: "desc" },
+        take: 50,
+        include: { order: { select: { orderNumber: true, planPriceCents: true } } },
+      },
     },
   });
   if (!sub) notFound();
@@ -117,7 +123,18 @@ export default async function AdminSubscriptionDetailPage({
                   {sub.payments.map((p) => (
                     <li key={p.id} className="flex justify-between gap-3 py-2">
                       <span>
-                        {formatPrice(p.amountCents, p.currency)} · {p.provider}
+                        {formatPrice(
+                          // Show the plan's share, not the whole basket, when the
+                          // payment also covered stickers.
+                          p.kind === "ORDER" && p.order?.planPriceCents !== null
+                            ? (p.order?.planPriceCents ?? p.amountCents)
+                            : p.amountCents,
+                          p.currency,
+                        )}{" "}
+                        · {p.provider}
+                        {p.order && (
+                          <span className="text-black/40"> · with order {p.order.orderNumber}</span>
+                        )}
                       </span>
                       <span className="text-black/50">
                         {p.status} · {p.createdAt.toLocaleDateString()}

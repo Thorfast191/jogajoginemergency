@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { AbuseReportStatus } from "@prisma/client";
 import { getStaffWith } from "@/lib/session";
+import { can } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { pageParams } from "@/lib/pagination";
 import { Forbidden } from "@/components/admin/forbidden";
@@ -16,7 +17,12 @@ export default async function AdminAbuseReportsPage({
 }: {
   searchParams: Promise<{ status?: string; page?: string }>;
 }) {
-  if (!(await getStaffWith("console.view"))) return <Forbidden />;
+  const admin = await getStaffWith("console.view");
+  if (!admin) return <Forbidden />;
+  // Reading reports is open to any staff; closing one is a decision about a QR
+  // code. The action checks the same thing — this only keeps the console from
+  // offering a control that would answer "not for you".
+  const mayResolve = can(admin.role, "tags.manage");
 
   const sp = await searchParams;
   const status = STATUSES.find((s) => s === sp.status);
@@ -82,7 +88,11 @@ export default async function AdminAbuseReportsPage({
               </p>
               {r.details && <p className="mt-1 text-sm text-black/70">{r.details}</p>}
             </div>
-            <ReportStatusSelect reportId={r.id} status={r.status} />
+            {mayResolve ? (
+              <ReportStatusSelect reportId={r.id} status={r.status} />
+            ) : (
+              <span className="text-xs text-black/40">{r.status}</span>
+            )}
           </li>
         ))}
         {reports.length === 0 && <p className="text-sm text-black/50">No reports.</p>}

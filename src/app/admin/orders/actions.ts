@@ -144,9 +144,15 @@ export async function sendQrReminderAction(orderId: string): Promise<OrderAction
  * Support action: mint an extra QR for this order line without spending one of
  * the customer's slots. For replacing a sticker that arrived damaged or a code
  * that had to be taken down.
+ *
+ * Audited. It hands out a permanent, scannable, printable code on someone
+ * else's account, for free and without limit, and it is the one thing in the
+ * console that creates a customer-facing artifact out of nothing — so who made
+ * it has to be answerable.
  */
 export async function issueReplacementTagAction(orderItemId: string): Promise<OrderActionState> {
-  if (!(await getStaffWith("orders.manage"))) return { error: "Not authorized." };
+  const actor = await getStaffWith("orders.manage");
+  if (!actor) return { error: "Not authorized." };
 
   const item = await prisma.orderItem.findUnique({
     where: { id: orderItemId },
@@ -154,23 +160,33 @@ export async function issueReplacementTagAction(orderItemId: string): Promise<Or
       id: true,
       productId: true,
       orderId: true,
+      themeId: true,
       product: { select: { themeId: true } },
-      order: { select: { userId: true } },
+      order: { select: { userId: true, orderNumber: true } },
     },
   });
   if (!item) return { error: "Order line not found." };
 
-  await prisma.$transaction((tx) =>
+  const tag = await prisma.$transaction((tx) =>
     createTag(tx, {
       userId: item.order.userId,
       productId: item.productId,
       orderItemId: item.id,
-      themeId: item.product.themeId,
+      // The artwork this line was actually bought in, so a replacement matches
+      // the sticker the customer is holding — not the product's default.
+      themeId: item.themeId ?? item.product.themeId,
       // Marked as a replacement so it doesn't spend one of the customer's
       // purchased slots — which would leave them unable to generate the code
       // they actually paid for.
       isReplacement: true,
     }),
+  );
+
+  await audit(
+    actor.id,
+    "tag.replacement",
+    { type: "tag", id: tag.id },
+    `Issued replacement /t/${tag.shortCode} on order ${item.order.orderNumber}`,
   );
 
   revalidate(item.orderId);

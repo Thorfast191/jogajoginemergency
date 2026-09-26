@@ -71,12 +71,23 @@ export async function setUserStatusAction(
  * then cannot receive a reset link. Restricted to customers: an admin's own
  * details are changed at /admin/profile, and another admin's are theirs alone.
  */
+/**
+ * Correct a customer's name or email.
+ *
+ * Audited, and an email change is audited loudly. Changing the address on an
+ * account is a route to everything in it: set it to one you control, ask for a
+ * password reset, and you are signed in as that customer, reading their blood
+ * group, their medical notes and who to call. That is a support tool an admin
+ * legitimately needs, so the control is the record — a super admin can see, in
+ * the activity log, every address that was ever changed and by whom.
+ */
 export async function updateCustomerIdentityAction(
   userId: string,
   _prev: AdminActionState,
   formData: FormData,
 ): Promise<AdminActionState> {
-  if (!(await getStaffWith("users.manage"))) return { error: "Not authorized." };
+  const actor = await getStaffWith("users.manage");
+  if (!actor) return { error: "Not authorized." };
 
   const parsed = customerIdentitySchema.safeParse({
     name: formData.get("name"),
@@ -86,7 +97,7 @@ export async function updateCustomerIdentityAction(
 
   const target = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, role: true },
+    select: { id: true, role: true, name: true, email: true },
   });
   if (!target) return { error: "User not found." };
   if (isStaff(target.role)) return { error: "Admin accounts are edited by their owners at /admin/profile." };
@@ -98,10 +109,26 @@ export async function updateCustomerIdentityAction(
   });
   if (clash) return { error: "Another account already uses that email." };
 
+  const name = parsed.data.name.trim();
+  const emailChanged = email !== target.email;
+  const nameChanged = name !== target.name;
+
   await prisma.user.update({
     where: { id: target.id },
-    data: { name: parsed.data.name.trim(), email },
+    data: { name, email },
   });
+
+  if (emailChanged || nameChanged) {
+    const changes: string[] = [];
+    if (emailChanged) changes.push(`email ${target.email} → ${email}`);
+    if (nameChanged) changes.push(`name "${target.name ?? ""}" → "${name}"`);
+    await audit(
+      actor.id,
+      emailChanged ? "customer.email" : "customer.name",
+      { type: "user", id: target.id },
+      `${target.email}: ${changes.join(", ")}`,
+    );
+  }
 
   revalidatePath("/admin/users");
   revalidatePath(`/admin/users/${target.id}`);
@@ -171,16 +198,33 @@ export async function resolveAbuseReportAction(
   reportId: string,
   status: (typeof REPORT_STATUSES)[number],
 ): Promise<AdminActionState> {
-  if (!(await getStaffWith("console.view"))) return { error: "Not authorized." };
+  // `tags.manage`, not `console.view`: closing a safety report is a decision
+  // about a QR code, and the weakest permission in the console should not carry
+  // it. Acting on one — taking the code down — still needs `destructive`.
+  const actor = await getStaffWith("tags.manage");
+  if (!actor) return { error: "Not authorized." };
   if (!REPORT_STATUSES.includes(status)) return { error: "Invalid status." };
 
-  const report = await prisma.abuseReport.findUnique({ where: { id: reportId }, select: { id: true } });
+  const report = await prisma.abuseReport.findUnique({
+    where: { id: reportId },
+    select: { id: true, status: true, tag: { select: { shortCode: true } } },
+  });
   if (!report) return { error: "That report no longer exists." };
 
   await prisma.abuseReport.update({
     where: { id: reportId },
     data: { status, resolvedAt: status === "RESOLVED" || status === "DISMISSED" ? new Date() : null },
   });
+
+  // Who closed a report on someone's page, and when, is exactly what a
+  // complaint about the decision will ask for.
+  await audit(
+    actor.id,
+    "abuse-report.status",
+    { type: "abuse-report", id: reportId },
+    `Report on /t/${report.tag?.shortCode ?? "?"}: ${report.status} → ${status}`,
+  );
+
   revalidatePath("/admin/abuse-reports");
   return { ok: true };
 }

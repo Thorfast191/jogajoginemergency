@@ -88,7 +88,13 @@ last super admin can't be demoted, and only active accounts get admin access. A 
 stamps `User.roleChangedAt`, which revokes that person's outstanding JWTs.
 
 Every money, pricing, destructive and admin-management action writes an `AdminAuditLog` row,
-shown at `/admin/activity`.
+shown at `/admin/activity` — and so do the two support actions that are not any of those but
+are just as consequential: **changing a customer's name or email**, and **issuing a replacement
+QR**. An email change is a route into the account (change it, request a password reset, sign in
+as them and read their medical details), so a plain admin keeps the ability and the activity log
+keeps the receipt. Closing an abuse report needs `tags.manage` rather than `console.view`, and is
+recorded too. Every action prefix has a filter group on `/admin/activity`; adding an audited
+action means adding it there, or the row only ever shows under "Everything".
 
 ## Plans, settings and monitoring
 

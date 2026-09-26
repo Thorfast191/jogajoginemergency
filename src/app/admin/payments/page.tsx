@@ -25,6 +25,8 @@ export default async function AdminPaymentsPage() {
       order: {
         select: {
           orderNumber: true,
+          planPriceCents: true,
+          plan: { select: { name: true } },
           user: { select: { name: true, email: true } },
         },
       },
@@ -33,17 +35,30 @@ export default async function AdminPaymentsPage() {
     take: 300,
   });
 
-  const succeededByKind = { ORDER: 0, SUBSCRIPTION: 0 };
+  // Split by what the money bought, not by which record the payment hangs off.
+  // A plan added to a sticker's checkout is one ORDER payment covering both, so
+  // counting by `kind` would credit the whole thing to stickers and report plan
+  // revenue trending to zero while plans were in fact selling.
+  let stickerRevenue = 0;
+  let planRevenue = 0;
   for (const p of payments) {
-    if (p.status === "SUCCEEDED") succeededByKind[p.kind] += p.amountCents;
+    if (p.status !== "SUCCEEDED") continue;
+    if (p.kind === "SUBSCRIPTION") {
+      planRevenue += p.amountCents;
+      continue;
+    }
+    const planPart = p.order?.planPriceCents ?? 0;
+    planRevenue += planPart;
+    stickerRevenue += Math.max(0, p.amountCents - planPart);
   }
-  const succeededTotal = succeededByKind.ORDER + succeededByKind.SUBSCRIPTION;
+  const succeededTotal = stickerRevenue + planRevenue;
 
   return (
     <div>
       <h1 className="text-2xl font-bold">Payments</h1>
       <p className="mt-1 text-sm text-black/60">
-        All order and subscription payments, across every gateway.
+        All order and plan payments, across every gateway. A checkout that included a plan is one
+        payment, split across the two figures below by what it bought.
       </p>
 
       <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -56,14 +71,12 @@ export default async function AdminPaymentsPage() {
           <p className="mt-1 text-2xl font-semibold">{formatPrice(succeededTotal, "BDT")}</p>
         </div>
         <div className="rounded-lg border border-black/10 p-4">
-          <p className="text-xs text-black/50">Orders</p>
-          <p className="mt-1 text-2xl font-semibold">{formatPrice(succeededByKind.ORDER, "BDT")}</p>
+          <p className="text-xs text-black/50">Stickers</p>
+          <p className="mt-1 text-2xl font-semibold">{formatPrice(stickerRevenue, "BDT")}</p>
         </div>
         <div className="rounded-lg border border-black/10 p-4">
-          <p className="text-xs text-black/50">Subscriptions</p>
-          <p className="mt-1 text-2xl font-semibold">
-            {formatPrice(succeededByKind.SUBSCRIPTION, "BDT")}
-          </p>
+          <p className="text-xs text-black/50">Plans</p>
+          <p className="mt-1 text-2xl font-semibold">{formatPrice(planRevenue, "BDT")}</p>
         </div>
       </div>
 
@@ -82,9 +95,12 @@ export default async function AdminPaymentsPage() {
           <tbody>
             {payments.map((p) => {
               const who = p.order?.user ?? p.subscription?.user;
+              // An order that carried a plan says so, or the row reads as a
+              // sticker sale for an amount the stickers do not explain.
               const forWhat =
                 p.kind === "ORDER"
-                  ? `Order ${p.order?.orderNumber ?? "—"}`
+                  ? `Order ${p.order?.orderNumber ?? "—"}` +
+                    (p.order?.plan ? ` + ${p.order.plan.name} plan` : "")
                   : `${p.subscription?.plan.name ?? "—"} plan`;
               return (
                 <tr key={p.id} className="border-b border-black/5 last:border-b-0 align-top">

@@ -379,7 +379,10 @@ model Payment {
   updatedAt        DateTime        @updatedAt
 
   order        Order?        @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  // SetNull, not Cascade: a payment covering an order *and* the plan bought in
+  // the same checkout is linked to both, and losing a subscription must never
+  // erase the record of money taken for it.
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
 
   @@index([orderId])
   @@index([subscriptionId])

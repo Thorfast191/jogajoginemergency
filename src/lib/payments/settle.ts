@@ -142,11 +142,20 @@ export async function settlePayment(
       // covered both, so this is where the page is published — not a second
       // trip to a gateway the customer never knew about.
       if (payment.order.planId && payment.order.plan) {
-        await activateSubscription(tx, {
+        const subscriptionId = await activateSubscription(tx, {
           userId: payment.order.userId,
           planId: payment.order.planId,
           intervalMonths: payment.order.plan.intervalMonths,
           provider: payment.provider,
+        });
+
+        // This one payment bought the stickers *and* the plan, so it is linked
+        // to both. Without it, the console answers "why is this page live, who
+        // paid for it?" with "no payments on this subscription". `kind` stays
+        // ORDER — it is what decides how this settles, and must not change.
+        await tx.payment.update({
+          where: { id: payment.id },
+          data: { subscriptionId },
         });
       }
     }
@@ -193,7 +202,7 @@ async function activateSubscription(
     intervalMonths: number;
     provider: string;
   },
-): Promise<void> {
+): Promise<string> {
   const existing = await tx.subscription.findFirst({
     where: { userId: params.userId },
     orderBy: { createdAt: "desc" },
@@ -213,10 +222,10 @@ async function activateSubscription(
         currentPeriodEnd: extendPeriod(existing.currentPeriodEnd, params.intervalMonths, now),
       },
     });
-    return;
+    return existing.id;
   }
 
-  await tx.subscription.create({
+  const created = await tx.subscription.create({
     data: {
       userId: params.userId,
       planId: params.planId,
@@ -224,5 +233,7 @@ async function activateSubscription(
       status: "ACTIVE",
       currentPeriodEnd: extendPeriod(new Date(0), params.intervalMonths, now),
     },
+    select: { id: true },
   });
+  return created.id;
 }

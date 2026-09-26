@@ -8,10 +8,16 @@ import { Pagination } from "@/components/admin/pagination";
 
 export const dynamic = "force-dynamic";
 
+// Every group must have a home for every action that is written, or a row is
+// only ever visible under "Everything" — which is where an untracked-looking
+// change hides in plain sight.
 const GROUPS = [
   { id: "money", label: "Money", prefixes: ["order.", "subscription."] },
   { id: "pricing", label: "Pricing", prefixes: ["product.", "plan."] },
-  { id: "takedowns", label: "Takedowns", prefixes: ["tag.", "user.", "theme."] },
+  // Spans tags, accounts and themes: takedowns, suspensions and archives.
+  { id: "codes", label: "Codes & accounts", prefixes: ["tag.", "user.", "theme."] },
+  // Changes to a customer's own record, and decisions about reports on them.
+  { id: "customers", label: "Customers", prefixes: ["customer.", "abuse-report."] },
   { id: "admins", label: "Admins", prefixes: ["admin."] },
   { id: "platform", label: "Platform", prefixes: ["settings.", "maintenance."] },
 ] as const;
@@ -73,7 +79,8 @@ export default async function AdminActivityPage({
     <div>
       <h1 className="text-2xl font-bold">Activity log</h1>
       <p className="mt-1 text-sm text-black/60">
-        Every money, pricing, takedown and admin change made in the console, newest first.
+        Every money, pricing, customer, takedown and admin change made in the console, newest
+        first.
       </p>
 
       <div className="mt-5 flex flex-wrap gap-2 text-sm">

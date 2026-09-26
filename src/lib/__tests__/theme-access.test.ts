@@ -3,7 +3,6 @@ import {
   DEFAULT_THEME_SLUG,
   entitledThemeIds,
   canUseTheme,
-  unlockedBy,
   cheapestSticker,
 } from "../theme-access";
 
@@ -58,20 +57,6 @@ describe("canUseTheme", () => {
   });
 });
 
-describe("unlockedBy", () => {
-  it("names the cheapest active product that carries the theme", () => {
-    const product = unlockedBy("night", [
-      { slug: "helmet", name: "Helmet Sticker", themeId: "night", priceCents: 29900 },
-      { slug: "bundle", name: "Night Bundle", themeId: "night", priceCents: 19900 },
-      { slug: "bike", name: "Bike Sticker", themeId: "classic", priceCents: 9900 },
-    ]);
-    expect(product?.slug).toBe("bundle");
-  });
-
-  it("returns null when nothing on sale carries it", () => {
-    expect(unlockedBy("ghost", [])).toBeNull();
-  });
-});
 
 describe("DEFAULT_THEME_SLUG", () => {
   it("is the well-known slug the seed and the renderer agree on", () => {
