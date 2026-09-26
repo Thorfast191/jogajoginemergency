@@ -122,6 +122,48 @@ action means adding it there, or the row only ever shows under "Everything".
   forward, which put every older record out of the console's reach. The figures on
   `/admin/payments` are aggregated across the whole table, never the page being shown.
 
+## Three hostnames, one deployment
+
+| Host | Serves |
+|---|---|
+| `jogajoginemergency.com` | the public site, the shop, checkout, and every scan page |
+| `client.jogajoginemergency.com` | the customer's area (`/dashboard/*`) |
+| `admin.jogajoginemergency.com` | the console (`/admin/*`) |
+
+`src/lib/hosts.ts` holds the rules and `src/proxy.ts` applies them per request: a
+path belonging to another area is redirected to the host that serves it, so an old
+`/dashboard` bookmark on the main domain still works, and the console is not reachable
+at the address a stranger scans a sticker with. Both private hosts are sent
+`X-Robots-Tag: noindex`.
+
+The split is worth more than tidiness: a console on its own hostname can be put behind
+a WAF rule, an IP allow-list or an identity proxy without any of that touching the scan
+page someone has to reach at 2am with a found helmet.
+
+**One sign-in covers all three.** The session cookie is issued for the shared parent
+domain (`src/lib/cookie-domain.ts`). Auth.js's default CSRF cookie uses the `__Host-`
+prefix, which browsers reject outright if it carries a `Domain`, so it is renamed to
+`__Secure-` — the protections that can still apply are kept, and the one that cannot is
+dropped rather than silently breaking every sign-in.
+
+**Crossing hosts from a Server Action.** An action's `redirect()` is resolved by the
+client router, which cannot move the address bar to another origin — signing in left the
+customer sitting on `/login` while the dashboard loaded underneath. So the login action
+returns its destination (`LoginState.go`) and the form navigates; `/continue` does the
+same job for places that can redirect, checking the target against the three origins this
+deployment actually serves so it can never become an open redirect.
+
+Leave `NEXT_PUBLIC_CLIENT_URL` and `NEXT_PUBLIC_ADMIN_URL` unset and all of this collapses
+to the single-host behaviour the app had before — which is what every dev machine gets.
+`lvh.me` and its subdomains resolve to 127.0.0.1, so the split can be exercised locally:
+
+```bash
+NEXT_PUBLIC_APP_URL=http://lvh.me:3005 \
+NEXT_PUBLIC_CLIENT_URL=http://client.lvh.me:3005 \
+NEXT_PUBLIC_ADMIN_URL=http://admin.lvh.me:3005 \
+AUTH_TRUST_HOST=true npm run dev -- -p 3005
+```
+
 ## Public site
 
 `/` (hero, how it works, a live demo phone cycling through themes, stickers, pricing,

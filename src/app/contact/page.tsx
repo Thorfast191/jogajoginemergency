@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { clientHref } from "@/lib/hosts";
 import Link from "next/link";
 import { getSettings } from "@/lib/settings";
 import { ContentPage, ContentSection } from "@/components/content-page";
@@ -50,7 +51,7 @@ export default async function ContactPage() {
       <ContentSection title="Already a customer?">
         <p>
           Most things can be done from your{" "}
-          <Link href="/dashboard" className="font-semibold text-[var(--color-primary)] hover:underline">
+          <Link href={clientHref("/dashboard")} className="font-semibold text-[var(--color-primary)] hover:underline">
             dashboard
           </Link>
           : generate and download QR codes, mark a tag lost, change what finders see, or manage

@@ -38,6 +38,11 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Development only. The three areas live on three hostnames in production
+  // (src/lib/hosts.ts); `lvh.me` and its subdomains resolve to 127.0.0.1, which
+  // is how that split can be exercised locally. Without this, `next dev` serves
+  // its own client bundle only to `localhost` and the page never hydrates.
+  allowedDevOrigins: ["lvh.me", "client.lvh.me", "admin.lvh.me"],
   output: "standalone",
 
   // Uploads go through Server Actions, whose 1 MB default body cap would

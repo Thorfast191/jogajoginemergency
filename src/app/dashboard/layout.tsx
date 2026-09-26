@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireActiveUser } from "@/lib/session";
 import { signOutAction } from "@/app/auth-actions";
+import { adminHref } from "@/lib/hosts";
 import { SideNav, type SideNavSection } from "@/components/side-nav";
 import { Icon } from "@/components/icons";
 
@@ -33,7 +34,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (!user) redirect("/login");
 
   if (user.role !== "USER") {
-    redirect("/admin");
+    redirect(adminHref("/admin"));
   }
 
   return (

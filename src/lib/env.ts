@@ -76,6 +76,32 @@ export function checkEnv(env: Env, mode: EnvMode): EnvReport {
     }
   }
 
+  // The client area and the console may live on their own hostnames. When they
+  // do, they must be https like the main site, and they must share a parent
+  // domain with it — the session cookie is issued for that parent, and without
+  // one a customer who signs in on the main site is signed out the moment they
+  // reach their own area.
+  for (const key of ["NEXT_PUBLIC_CLIENT_URL", "NEXT_PUBLIC_ADMIN_URL"] as const) {
+    const raw = value(env, key);
+    if (!raw) continue;
+    let parsed: URL | null = null;
+    try {
+      parsed = new URL(raw);
+    } catch {
+      errors.push({ key, message: "Not a valid absolute URL." });
+      continue;
+    }
+    if (production && parsed.protocol !== "https:") {
+      errors.push({ key, message: "Must be https in production." });
+    }
+    if (appUrl && !sharesParentDomain(appUrl, raw)) {
+      warnings.push({
+        key,
+        message: "No parent domain shared with NEXT_PUBLIC_APP_URL: sign-in will not carry across.",
+      });
+    }
+  }
+
   // The demo gateway settles payments without taking money. config.ts already
   // refuses it when PAYMENT_MODE is live; this catches the likelier mistake of
   // deploying to production having never set PAYMENT_MODE at all.
@@ -152,4 +178,26 @@ export function assertEnv(env: Env = process.env, mode?: EnvMode): EnvReport {
   }
 
   return report;
+}
+
+/**
+ * Whether two origins share a registrable parent domain, which is what decides
+ * if one session cookie can cover both.
+ *
+ * Deliberately loose — it answers "could a cookie span these", not "is this a
+ * public suffix". `src/lib/cookie-domain.ts` is what actually issues one.
+ */
+function sharesParentDomain(a: string, b: string): boolean {
+  const host = (u: string) => {
+    try {
+      return new URL(u).hostname.toLowerCase();
+    } catch {
+      return null;
+    }
+  };
+  const [x, y] = [host(a), host(b)];
+  if (!x || !y) return false;
+  if (x === y) return true;
+  const parent = (h: string) => h.split(".").slice(-2).join(".");
+  return parent(x) === parent(y) && parent(x).includes(".");
 }

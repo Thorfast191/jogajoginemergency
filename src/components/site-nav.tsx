@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireActiveUser } from "@/lib/session";
 import { readLiveCart } from "@/lib/cart-server";
 import { cartCount } from "@/lib/cart";
-import { isStaff } from "@/lib/permissions";
+import { homeForRole } from "@/lib/hosts";
 import { getSettings } from "@/lib/settings";
 import { SiteMobileMenu, SiteNavLinks, type NavItem } from "@/components/site-nav-links";
 
@@ -22,7 +22,7 @@ export async function SiteNav() {
   const count = cartCount(cart.lines);
 
   const account: NavItem[] = user
-    ? [{ href: isStaff(user.role) ? "/admin" : "/dashboard", label: "Dashboard" }]
+    ? [{ href: homeForRole(user.role), label: "Dashboard" }]
     : [
         { href: "/login", label: "Log in" },
         { href: "/signup", label: "Create account" },

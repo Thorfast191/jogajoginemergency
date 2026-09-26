@@ -4,6 +4,7 @@ import { getCustomer } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { slotBalanceForUser } from "@/lib/slots-server";
 import { orderReadiness } from "@/lib/print-server";
+import { clientHref } from "@/lib/hosts";
 import { userIsEntitled } from "@/lib/subscription";
 import { MascotCheer } from "@/components/illustrations";
 import { ButtonLinkClass } from "@/components/ui";
@@ -25,7 +26,7 @@ export default async function CheckoutSuccessPage({
         include: { items: { include: { product: true } } },
       })
     : null;
-  if (!order) redirect("/dashboard/orders");
+  if (!order) redirect(clientHref("/dashboard/orders"));
 
   // Only a paid order is confirmed. Anyone can reach this URL for their own
   // pending or cancelled order, and "Order confirmed" there would be false.

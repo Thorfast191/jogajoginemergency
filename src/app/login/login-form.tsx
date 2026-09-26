@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 import { useKeptForm } from "@/lib/use-kept-form";
 import Link from "next/link";
 import { loginAction, type LoginState } from "./actions";
@@ -10,6 +10,12 @@ const initialState: LoginState = {};
 export function LoginForm({ next }: { next?: string }) {
   const [state, formAction, pending] = useActionState(loginAction, initialState);
   const [formRef, submitForm] = useKeptForm(formAction, state);
+
+  // Signing in can land on a different hostname — the client area and the
+  // console are their own hosts. The router cannot navigate there, so this does.
+  useEffect(() => {
+    if (state.go) window.location.assign(state.go);
+  }, [state.go]);
 
   return (
     <form ref={formRef} action={formAction} onSubmit={submitForm} className="space-y-4">

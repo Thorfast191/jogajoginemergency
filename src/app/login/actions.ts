@@ -6,6 +6,7 @@ import { signIn } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { loginSchema } from "@/lib/validations";
 import { isSafeNext } from "@/lib/nav";
+import { adminHref, areaForPath, clientHref, hrefIn } from "@/lib/hosts";
 import { isStaff } from "@/lib/permissions";
 import { LoginThrottled } from "@/lib/login-throttle";
 
@@ -15,7 +16,17 @@ import { LoginThrottled } from "@/lib/login-throttle";
 const THROTTLED = "Too many failed attempts. Please try again in a few minutes.";
 const BAD_CREDENTIALS = "Invalid email or password.";
 
-export type LoginState = { error?: string };
+/**
+ * `go` is a destination on another one of our hostnames.
+ *
+ * A Server Action's redirect is resolved by the client router, which cannot
+ * move the address bar to a different origin: the customer stayed on /login
+ * while the dashboard was fetched underneath them. So a hop that leaves this
+ * host is handed back to the form, which performs a real navigation. Within one
+ * host — every single-host install — the action still redirects normally, and
+ * the form never sees `go` at all.
+ */
+export type LoginState = { error?: string; go?: string };
 
 export async function loginAction(
   _prevState: LoginState,
@@ -50,11 +61,17 @@ export async function loginAction(
     select: { role: true },
   });
 
-  if (isStaff(user?.role)) {
-    redirect("/admin");
-  }
-
+  // Staff always go to the console's host; a `?next=` they arrived with was a
+  // path on whichever host bounced them, and the console is not that host.
   const nextRaw = formData.get("next");
-  const next = typeof nextRaw === "string" && isSafeNext(nextRaw) ? nextRaw : "/dashboard";
-  redirect(next);
+  const target = isStaff(user?.role)
+    ? adminHref("/admin")
+    : typeof nextRaw === "string" && isSafeNext(nextRaw)
+      ? // `isSafeNext` has already refused anything but a same-origin path;
+        // this puts it on the host that actually serves it.
+        hrefIn(areaForPath(nextRaw), nextRaw)
+      : clientHref("/dashboard");
+
+  if (target.startsWith("http")) return { go: target };
+  redirect(target);
 }

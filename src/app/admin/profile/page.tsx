@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { clientHref } from "@/lib/hosts";
 import { getAdmin } from "@/lib/session";
 import { AdminIdentityForm, AdminPasswordForm } from "./profile-forms";
 
@@ -6,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminProfilePage() {
   const admin = await getAdmin();
-  if (!admin) redirect("/dashboard");
+  if (!admin) redirect(clientHref("/dashboard"));
 
   return (
     <div>

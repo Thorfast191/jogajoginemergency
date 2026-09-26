@@ -5,10 +5,52 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { getClientIp } from "@/lib/client-ip";
 import { LoginThrottled, loginAllowed, recordFailedLogin } from "@/lib/login-throttle";
+import { sessionCookieDomain } from "@/lib/cookie-domain";
+
+// One sign-in across three hostnames.
+//
+// The public site, the client area and the console are separate hosts (see
+// src/lib/hosts.ts), so the session cookie has to be issued for the parent
+// domain or signing in on one would not be seen by the others.
+//
+// The catch is the `__Host-` prefix Auth.js uses for its CSRF cookie by
+// default: browsers reject a `__Host-` cookie that carries a Domain attribute
+// at all, so a cookie named that way simply never gets stored and every
+// sign-in fails with a CSRF error. Naming it `__Secure-` keeps the protections
+// that still apply — Secure, and https-only — and drops the one that cannot.
+const cookieDomain = sessionCookieDomain();
+const secure = (process.env.NEXT_PUBLIC_APP_URL ?? "").startsWith("https://");
+const prefix = secure ? "__Secure-" : "";
+const shared = {
+  domain: cookieDomain ?? undefined,
+  path: "/",
+  sameSite: "lax",
+  secure,
+} as const;
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: PrismaAdapter(prisma),
   session: { strategy: "jwt" },
+  // Left to Auth.js entirely when the app is on one host, which is every dev
+  // machine: the defaults are stricter than this, and there is nothing to share.
+  ...(cookieDomain
+    ? {
+        cookies: {
+          sessionToken: {
+            name: `${prefix}authjs.session-token`,
+            options: { ...shared, httpOnly: true },
+          },
+          csrfToken: {
+            name: `${prefix}authjs.csrf-token`,
+            options: { ...shared, httpOnly: true },
+          },
+          callbackUrl: {
+            name: `${prefix}authjs.callback-url`,
+            options: { ...shared, httpOnly: true },
+          },
+        },
+      }
+    : {}),
   pages: {
     signIn: "/login",
   },
