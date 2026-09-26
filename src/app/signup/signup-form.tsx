@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 import { useKeptForm } from "@/lib/use-kept-form";
 import { signupAction, type SignupState } from "./actions";
 
@@ -8,6 +8,11 @@ const initialState: SignupState = {};
 
 export function SignupForm({ next }: { next?: string }) {
   const [state, formAction, pending] = useActionState(signupAction, initialState);
+
+  // A new account lands in the client area, which is a different hostname.
+  useEffect(() => {
+    if (state.go) window.location.assign(state.go);
+  }, [state.go]);
   const [formRef, submitForm] = useKeptForm(formAction, state);
 
   return (

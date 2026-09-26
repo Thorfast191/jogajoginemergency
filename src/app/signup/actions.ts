@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { signupSchema, firstIssue } from "@/lib/validations";
 import { isSafeNext } from "@/lib/nav";
+import { areaForPath, hrefIn } from "@/lib/hosts";
 import { AuthError } from "next-auth";
 import { signIn } from "@/lib/auth";
 import { recordHit } from "@/lib/rate-limit";
@@ -17,7 +18,13 @@ import { getClientIp } from "@/lib/client-ip";
 // console stub — revisit once real email is wired.
 const SIGNUP_LIMIT = { limit: 5, windowMs: 60 * 60_000 };
 
-export type SignupState = { error?: string };
+/**
+ * `go` is a destination on another one of our hostnames — the client area is
+ * its own host. A Server Action cannot redirect across origins (the client
+ * router resolves it and cannot move the address bar), so the form navigates.
+ * Same reasoning, and the same shape, as LoginState.
+ */
+export type SignupState = { error?: string; go?: string };
 
 export async function signupAction(
   _prevState: SignupState,
@@ -53,7 +60,9 @@ export async function signupAction(
   });
 
   const nextRaw = formData.get("next");
-  const next = typeof nextRaw === "string" && isSafeNext(nextRaw) ? nextRaw : "/dashboard";
+  const nextPath = typeof nextRaw === "string" && isSafeNext(nextRaw) ? nextRaw : "/dashboard";
+  // A new account is always a customer, and the client area is its own host.
+  const next = hrefIn(areaForPath(nextPath), nextPath);
 
   // The account exists either way. If signing in is refused — this connection
   // is throttled for failed logins — send them to log in rather than to an
@@ -61,9 +70,12 @@ export async function signupAction(
   try {
     await signIn("credentials", { email, password, redirect: false });
   } catch (err) {
-    if (err instanceof AuthError) redirect(`/login?next=${encodeURIComponent(next)}`);
+    if (err instanceof AuthError) {
+      redirect(`/login?next=${encodeURIComponent(nextPath)}`);
+    }
     throw err;
   }
 
+  if (next.startsWith("http")) return { go: next };
   redirect(next);
 }
