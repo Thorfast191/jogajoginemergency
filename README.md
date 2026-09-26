@@ -59,6 +59,12 @@ with it already selected.
 | `/api/orders/[id]/stickers` | staff with `orders.manage` | print file, one page per sticker |
 | `/api/themes/[id]/preview` | public for live themes | sample QR pointing at `/demo` |
 
+**Delivery address.** Correctable, which it has to be — a mistyped address used to be
+display-only on both sides, so the only outcomes were a lost parcel or a refund. The customer can
+fix their own until it ships (`canEditShipping` in `src/lib/order.ts`, one rule shared by the page
+and the action); staff can fix it at any point, because a shipped parcel is exactly when support
+gets involved, and their change is written to the activity log.
+
 **Print flow.** A paid order can't move to *Processing* until every QR on it is generated
 (`printReadiness` in `src/lib/print.ts`) — which paying normally satisfies on the spot. The
 reminder email sends nothing when an order needs no more codes, so it now only speaks up if
@@ -105,10 +111,16 @@ action means adding it there, or the row only ever shows under "Everything".
 - **Platform settings** (`/admin/settings`, one `PlatformSetting` row): support contacts shown
   in the footer and Contact page, an announcement banner, **pause orders**, and switching off
   configured gateways (in-flight payments still settle). Credentials stay in `.env`.
+  A pause reaches `/shop`, the product page (where "Buy now" is withheld, since it promises the
+  one thing a pause turns off), the cart and checkout, and the checkout action refuses
+  regardless. Adding to the cart still works — the cart is kept for when the shop reopens.
 - **Overview** shows permission-filtered tiles, scans per day for 30 days, and a
   needs-attention list (orders ready to print or waiting on customers, abuse reports,
-  expiring plans, failed emails). QR codes, users, subscriptions and scans are searchable and
-  paged.
+  expiring plans, failed emails).
+- Every console list is **paged**, and orders, QR codes, users and subscriptions are searchable.
+  Nothing is silently truncated: orders and payments used to stop at 300 rows with no way
+  forward, which put every older record out of the console's reach. The figures on
+  `/admin/payments` are aggregated across the whole table, never the page being shown.
 
 ## Public site
 
@@ -169,8 +181,10 @@ callbacks are built from it. If port 3000 is taken, run `npm run dev -- -p 3100`
 - `src/app/admin/*` — **console**: Overview, Orders, Products, Themes, Generated QR codes,
   Users, Subscriptions, Plans, Payments, Scan activity, Abuse reports, Admins, Settings,
   Activity log, My profile.
-- `src/lib/session.ts` — `requireActiveUser`, `getAdmin`, `getStaffWith`, `requirePermission`,
-  `getCustomer`, `requireCustomer`.
+- `src/lib/session.ts` — `requireActiveUser`, `getAdmin`, `getStaffWith`, `getCustomer`,
+  `requireCustomer`. Every guard in the app goes through `requireActiveUser`, which reads the
+  role and status from the database rather than the token, so a suspension or a demotion takes
+  effect on the next request.
 - `src/lib/tag-issue.ts` — the one place a purchased slot becomes a code, for both the automatic
   path and the Generate button.
 - `src/lib/` rules, each with tests: `permissions`, `admin-guards`, `token-freshness`,
@@ -272,7 +286,8 @@ without spending a slot but can never move a tag between accounts.
 - **An order-confirmation email** — paying now issues the codes, so the QR reminder that used to
   follow a purchase stays quiet. Nothing else takes its place.
 - **SMS** — everything is email; `src/lib/notify/transport.ts` is where a second channel goes.
-- **Courier integration** — fulfilment is tracked by hand.
+- **Courier integration** — fulfilment is tracked by hand, and there is no tracking number, so
+  "Shipped" tells a customer nothing they can act on.
 - **Legal review** of the Privacy and Terms pages.
 
 ## Deployment (self-hosted)

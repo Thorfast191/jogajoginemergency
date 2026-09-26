@@ -9,6 +9,7 @@ import { Icon } from "@/components/icons";
 import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/money";
 import { themeCssVars, type ThemeSkin } from "@/lib/themes";
+import { getSettings } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -20,9 +21,10 @@ export default async function ProductPage({
   searchParams: Promise<{ theme?: string | string[] }>;
 }) {
   const { slug } = await params;
-  const [product, skins] = await Promise.all([
+  const [product, skins, settings] = await Promise.all([
     prisma.product.findUnique({ where: { slug }, include: { theme: true } }),
     prisma.theme.findMany({ where: { status: "ACTIVE" }, orderBy: [{ sortOrder: "asc" }, { name: "asc" }] }),
+    getSettings(),
   ]);
   if (!product || product.status !== "ACTIVE") notFound();
 
@@ -153,18 +155,29 @@ export default async function ProductPage({
               </div>
             )}
 
+            {settings.ordersPaused && (
+              <p className="mt-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                {settings.ordersPausedMessage ?? "We're not taking new orders right now."} Your cart
+                is saved for when we reopen.
+              </p>
+            )}
+
             <div className="mt-8 flex flex-wrap gap-3">
               <AddToCartButton slug={product.slug} theme={chosenForCart}>
                 Add to cart
               </AddToCartButton>
-              <AddToCartButton
-                slug={product.slug}
-                theme={chosenForCart}
-                then="checkout"
-                className="rounded-xl border border-black/15 px-6 py-3 font-semibold hover:bg-black/5"
-              >
-                Buy now
-              </AddToCartButton>
+              {/* "Buy now" goes straight to checkout, which is the one thing a
+                  pause turns off — offering it would be a promise we refuse. */}
+              {!settings.ordersPaused && (
+                <AddToCartButton
+                  slug={product.slug}
+                  theme={chosenForCart}
+                  then="checkout"
+                  className="rounded-xl border border-black/15 px-6 py-3 font-semibold hover:bg-black/5"
+                >
+                  Buy now
+                </AddToCartButton>
+              )}
             </div>
 
             <ol className="mt-10 space-y-3 rounded-2xl border border-black/10 bg-white p-5 text-sm">

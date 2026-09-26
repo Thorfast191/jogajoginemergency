@@ -126,16 +126,25 @@ export const privacyPresetSchema = z.object({
 
 // --- Store: checkout ----------------------------------------------
 
-export const checkoutSchema = z.object({
-  // Minted per rendered checkout form; Order.idempotencyKey is unique, so a
-  // resubmit of the same form returns the original order.
-  idempotencyKey: z.string().min(8).max(64),
-  provider: z.enum(["DEMO", "SSLCOMMERZ", "BKASH", "NAGAD"]),
+// Where a parcel goes. Shared by checkout and by the two places an address can
+// be corrected afterwards — the customer's own order page while it is still
+// unshipped, and the console.
+export const shippingFields = {
   shipName: z.string().max(200).optional().nullable(),
   shipPhone: z.string().max(200).optional().nullable(),
   shipAddress: z.string().max(200).optional().nullable(),
   shipCity: z.string().max(200).optional().nullable(),
   shipNote: z.string().max(200).optional().nullable(),
+};
+
+export const shippingSchema = z.object(shippingFields);
+
+export const checkoutSchema = z.object({
+  // Minted per rendered checkout form; Order.idempotencyKey is unique, so a
+  // resubmit of the same form returns the original order.
+  idempotencyKey: z.string().min(8).max(64),
+  provider: z.enum(["DEMO", "SSLCOMMERZ", "BKASH", "NAGAD"]),
+  ...shippingFields,
 });
 
 // --- Admin: products & orders -------------------------------------

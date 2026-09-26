@@ -1,7 +1,11 @@
+import Link from "next/link";
+import type { Prisma } from "@prisma/client";
 import { getStaffWith } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/money";
+import { pageParams } from "@/lib/pagination";
 import { Forbidden } from "@/components/admin/forbidden";
+import { Pagination } from "@/components/admin/pagination";
 
 export const dynamic = "force-dynamic";
 
@@ -11,10 +15,24 @@ const statusColors: Record<string, string> = {
   FAILED: "bg-red-100 text-red-700",
 };
 
-export default async function AdminPaymentsPage() {
+// Mirrors the PaymentStatus enum — a payment is never "refunded"; the order is.
+const STATUSES = ["SUCCEEDED", "PENDING", "FAILED", "CANCELLED"] as const;
+type Status = (typeof STATUSES)[number];
+
+export default async function AdminPaymentsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string; page?: string }>;
+}) {
   if (!(await getStaffWith("money.manage"))) return <Forbidden />;
 
+  const sp = await searchParams;
+  const status = STATUSES.includes(sp.status as Status) ? (sp.status as Status) : undefined;
+  const { page, skip, take } = pageParams(sp.page);
+  const where: Prisma.PaymentWhereInput = status ? { status } : {};
+
   const payments = await prisma.payment.findMany({
+    where,
     include: {
       subscription: {
         select: {
@@ -32,26 +50,42 @@ export default async function AdminPaymentsPage() {
       },
     },
     orderBy: { createdAt: "desc" },
-    take: 300,
+    skip,
+    take,
   });
 
+  // The figures are aggregated across every payment, never over the page being
+  // shown — a paged list whose totals only counted 50 rows would be worse than
+  // no totals at all.
+  //
   // Split by what the money bought, not by which record the payment hangs off.
   // A plan added to a sticker's checkout is one ORDER payment covering both, so
   // counting by `kind` would credit the whole thing to stickers and report plan
   // revenue trending to zero while plans were in fact selling.
-  let stickerRevenue = 0;
-  let planRevenue = 0;
-  for (const p of payments) {
-    if (p.status !== "SUCCEEDED") continue;
-    if (p.kind === "SUBSCRIPTION") {
-      planRevenue += p.amountCents;
-      continue;
-    }
-    const planPart = p.order?.planPriceCents ?? 0;
-    planRevenue += planPart;
-    stickerRevenue += Math.max(0, p.amountCents - planPart);
-  }
+  const [total, byStatus, subsSum, orderSum, planInOrders] = await Promise.all([
+    prisma.payment.count({ where }),
+    prisma.payment.groupBy({ by: ["status"], _count: { _all: true } }),
+    prisma.payment.aggregate({
+      where: { status: "SUCCEEDED", kind: "SUBSCRIPTION" },
+      _sum: { amountCents: true },
+    }),
+    prisma.payment.aggregate({
+      where: { status: "SUCCEEDED", kind: "ORDER" },
+      _sum: { amountCents: true },
+    }),
+    // The plan's share of orders that were actually paid for.
+    prisma.order.aggregate({
+      where: { planId: { not: null }, payments: { some: { status: "SUCCEEDED", kind: "ORDER" } } },
+      _sum: { planPriceCents: true },
+    }),
+  ]);
+
+  const planPart = planInOrders._sum.planPriceCents ?? 0;
+  const planRevenue = (subsSum._sum.amountCents ?? 0) + planPart;
+  const stickerRevenue = Math.max(0, (orderSum._sum.amountCents ?? 0) - planPart);
   const succeededTotal = stickerRevenue + planRevenue;
+  const count = (s: string) => byStatus.find((g) => g.status === s)?._count._all ?? 0;
+  const allCount = byStatus.reduce((n, g) => n + g._count._all, 0);
 
   return (
     <div>
@@ -64,7 +98,7 @@ export default async function AdminPaymentsPage() {
       <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="rounded-lg border border-black/10 p-4">
           <p className="text-xs text-black/50">Records</p>
-          <p className="mt-1 text-2xl font-semibold">{payments.length}</p>
+          <p className="mt-1 text-2xl font-semibold">{allCount}</p>
         </div>
         <div className="rounded-lg border border-black/10 p-4">
           <p className="text-xs text-black/50">Succeeded total</p>
@@ -80,7 +114,25 @@ export default async function AdminPaymentsPage() {
         </div>
       </div>
 
-      <div className="mt-6 overflow-x-auto rounded-lg border border-black/10">
+      <div className="mt-6 flex flex-wrap gap-3 text-sm">
+        <Link
+          href="/admin/payments"
+          className={!status ? "font-semibold" : "text-black/50 hover:underline"}
+        >
+          All <span className="text-black/40">({allCount})</span>
+        </Link>
+        {STATUSES.map((s) => (
+          <Link
+            key={s}
+            href={`/admin/payments?status=${s}`}
+            className={status === s ? "font-semibold" : "text-black/50 hover:underline"}
+          >
+            {s} <span className="text-black/40">({count(s)})</span>
+          </Link>
+        ))}
+      </div>
+
+      <div className="mt-4 overflow-x-auto rounded-lg border border-black/10">
         <table className="w-full text-sm border-collapse">
           <thead>
             <tr className="text-left text-black/50 border-b border-black/10">
@@ -127,13 +179,15 @@ export default async function AdminPaymentsPage() {
             {payments.length === 0 && (
               <tr>
                 <td colSpan={6} className="py-10 px-4 text-center text-sm text-black/50">
-                  No payments recorded yet.
+                  {status ? `No ${status.toLowerCase()} payments.` : "No payments recorded yet."}
                 </td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
+
+      <Pagination basePath="/admin/payments" params={{ status }} page={page} total={total} />
     </div>
   );
 }

@@ -48,27 +48,17 @@ export async function getAdmin() {
   return user && isStaff(user.role) ? user : null;
 }
 
-/** Returns the active admin of either level, or throws. */
-export async function requireAdmin(): Promise<AuthedUser> {
-  const admin = await getAdmin();
-  if (!admin) throw new Error("Forbidden: admin access required.");
-  return admin;
-}
-
 /**
  * Returns the active staff member if their role grants `permission`, or null.
- * Pages use this and render <Forbidden /> on null.
+ *
+ * The console's one way in: pages render <Forbidden /> on null and server
+ * actions return a sentence. Deliberately not a throwing variant — a staff
+ * member whose role was narrowed mid-session should read why, not trip an
+ * error overlay.
  */
 export async function getStaffWith(permission: Permission) {
   const user = await requireActiveUser();
   return user && can(user.role, permission) ? user : null;
-}
-
-/** Returns the active staff member holding `permission`, or throws. For server actions. */
-export async function requirePermission(permission: Permission): Promise<AuthedUser> {
-  const user = await getStaffWith(permission);
-  if (!user) throw new Error("Forbidden: you don't have permission to do that.");
-  return user;
 }
 
 // --- Customer (subscription-based product user) --------------------------

@@ -7,17 +7,21 @@ import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/money";
 import { EmptyState, Badge } from "@/components/ui";
 import { EmptyTags } from "@/components/illustrations";
+import { getSettings } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
 export default async function ShopPage() {
-  const products = await prisma.product.findMany({
-    where: { status: "ACTIVE" },
-    orderBy: { sortOrder: "asc" },
-    // Only a live theme has a public preview image; a drafted or archived one
-    // would render a broken image instead of the product's own photo.
-    include: { theme: { select: { id: true, name: true, status: true } } },
-  });
+  const [products, settings] = await Promise.all([
+    prisma.product.findMany({
+      where: { status: "ACTIVE" },
+      orderBy: { sortOrder: "asc" },
+      // Only a live theme has a public preview image; a drafted or archived one
+      // would render a broken image instead of the product's own photo.
+      include: { theme: { select: { id: true, name: true, status: true } } },
+    }),
+    getSettings(),
+  ]);
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -35,6 +39,16 @@ export default async function ShopPage() {
         </section>
 
         <div className="mx-auto w-full max-w-6xl px-4 py-12">
+          {/* Said here, not discovered at the cart. Adding is still allowed —
+              the cart is kept — but nothing promises a checkout that refuses. */}
+          {settings.ordersPaused && (
+            <p className="mb-8 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              {settings.ordersPausedMessage ??
+                "We're not taking new orders right now."}{" "}
+              You can still fill your cart — it&apos;s saved for when we reopen.
+            </p>
+          )}
+
           {products.length === 0 ? (
             <div className="mx-auto max-w-md">
               <EmptyState illustration={<EmptyTags />} title="Products coming soon">

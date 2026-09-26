@@ -72,3 +72,23 @@ export function orderPlanMatchesCart(ordered: OrderPlanRef, inCart: OrderPlanRef
   if (ordered.planId !== inCart.planId) return false;
   return (ordered.planPriceCents ?? null) === (inCart.planPriceCents ?? null);
 }
+
+/**
+ * Whether a delivery address may still be corrected.
+ *
+ * A mistyped address is only fixable while the parcel is still here. Once it is
+ * with a courier, editing the record would show a destination the parcel is not
+ * going to; on a cancelled or refunded order there is nothing to deliver. The
+ * window is generous in practice — a sticker cannot be printed until its QR
+ * exists, so orders sit unshipped for a while, which is when a typo is noticed.
+ *
+ * One rule, two callers: the customer's order page renders by it and the server
+ * action enforces it, so the form is never offered where the save would refuse.
+ */
+export function canEditShipping(order: {
+  status: string;
+  fulfillmentStatus: string;
+}): boolean {
+  if (order.status === "CANCELLED" || order.status === "REFUNDED") return false;
+  return order.fulfillmentStatus !== "SHIPPED" && order.fulfillmentStatus !== "DELIVERED";
+}

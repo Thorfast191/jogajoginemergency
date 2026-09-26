@@ -4,6 +4,9 @@ import { getCustomer } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/money";
 import { intervalLabel } from "@/lib/subscription-periods";
+import { canEditShipping } from "@/lib/order";
+import { ShippingForm } from "@/components/shipping-form";
+import { updateMyShippingAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +24,9 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     },
   });
   if (!order) notFound();
+
+  const closed = order.status === "CANCELLED" || order.status === "REFUNDED";
+  const mayEditShipping = canEditShipping(order);
 
   return (
     <div>
@@ -94,17 +100,42 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
         </ul>
       </div>
 
-      {(order.shipName || order.shipAddress) && (
-        <div className="mt-4 rounded-lg border border-black/10 p-4 text-sm">
-          <h2 className="font-semibold">Shipping</h2>
+      <div className="mt-4 rounded-lg border border-black/10 p-4 text-sm">
+        <h2 className="font-semibold">Shipping</h2>
+        {order.shipName || order.shipAddress ? (
           <p className="mt-1 text-black/70">
             {[order.shipName, order.shipPhone, order.shipAddress, order.shipCity]
               .filter(Boolean)
               .join(" · ")}
           </p>
-          {order.shipNote && <p className="mt-1 text-black/50">{order.shipNote}</p>}
-        </div>
-      )}
+        ) : (
+          <p className="mt-1 text-black/50">No delivery address on this order.</p>
+        )}
+        {order.shipNote && <p className="mt-1 text-black/50">{order.shipNote}</p>}
+
+        {/* Yours to fix until it ships — after that the parcel is with a
+            courier and an edit here would just be wrong. */}
+        {mayEditShipping ? (
+          <details className="mt-3">
+            <summary className="cursor-pointer text-xs font-medium text-black/50 hover:text-black">
+              Change this address
+            </summary>
+            <div className="mt-3">
+              <ShippingForm
+                action={updateMyShippingAction.bind(null, order.id)}
+                values={order}
+                submitLabel="Save address"
+              />
+            </div>
+          </details>
+        ) : (
+          <p className="mt-3 text-xs text-black/40">
+            {closed
+              ? "This order is closed, so its address can no longer be changed."
+              : "This order has shipped, so its address can no longer be changed. Contact us if it needs to go somewhere else."}
+          </p>
+        )}
+      </div>
     </div>
   );
 }

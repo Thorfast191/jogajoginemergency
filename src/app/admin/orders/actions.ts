@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getStaffWith } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { orderStatusSchema, fulfillmentStatusSchema } from "@/lib/validations";
+import { orderStatusSchema, fulfillmentStatusSchema, shippingSchema, firstIssue } from "@/lib/validations";
 import { createTag } from "@/lib/tag";
 import { audit } from "@/lib/audit";
 import { orderReadiness } from "@/lib/print-server";
@@ -190,5 +190,70 @@ export async function issueReplacementTagAction(orderItemId: string): Promise<Or
   );
 
   revalidate(item.orderId);
+  return { ok: true };
+}
+
+/**
+ * Correct where a parcel is going.
+ *
+ * A mistyped address used to be unfixable: the console showed it and nothing
+ * could change it, and the customer had no edit either, so the only outcomes
+ * were a lost parcel or a refund. Staff take these over the phone, so this is
+ * `orders.manage` rather than a super-admin power — and audited, because "who
+ * changed this address?" is exactly what a missing parcel asks.
+ */
+export async function updateOrderShippingAction(
+  orderId: string,
+  _prev: OrderActionState,
+  formData: FormData,
+): Promise<OrderActionState> {
+  const actor = await getStaffWith("orders.manage");
+  if (!actor) return { error: "Not authorized." };
+
+  const parsed = shippingSchema.safeParse({
+    shipName: formData.get("shipName") || null,
+    shipPhone: formData.get("shipPhone") || null,
+    shipAddress: formData.get("shipAddress") || null,
+    shipCity: formData.get("shipCity") || null,
+    shipNote: formData.get("shipNote") || null,
+  });
+  if (!parsed.success) return { error: firstIssue(parsed.error) };
+
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: {
+      orderNumber: true,
+      shipName: true,
+      shipPhone: true,
+      shipAddress: true,
+      shipCity: true,
+      shipNote: true,
+    },
+  });
+  if (!order) return { error: "Order not found." };
+
+  const next = {
+    shipName: parsed.data.shipName?.trim() || null,
+    shipPhone: parsed.data.shipPhone?.trim() || null,
+    shipAddress: parsed.data.shipAddress?.trim() || null,
+    shipCity: parsed.data.shipCity?.trim() || null,
+    shipNote: parsed.data.shipNote?.trim() || null,
+  };
+
+  const changed = (Object.keys(next) as (keyof typeof next)[]).filter(
+    (k) => (order[k] ?? null) !== next[k],
+  );
+  if (changed.length === 0) return { ok: true };
+
+  await prisma.order.update({ where: { id: orderId }, data: next });
+
+  await audit(
+    actor.id,
+    "order.shipping",
+    { type: "order", id: orderId },
+    `${order.orderNumber}: changed ${changed.map((k) => k.replace("ship", "").toLowerCase()).join(", ")}`,
+  );
+
+  revalidate(orderId);
   return { ok: true };
 }

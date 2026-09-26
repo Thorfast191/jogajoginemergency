@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { generateOrderNumber, orderMatchesCart, orderPlanMatchesCart } from "../order";
+import {
+  generateOrderNumber,
+  orderMatchesCart,
+  orderPlanMatchesCart,
+  canEditShipping,
+} from "../order";
 
 describe("generateOrderNumber", () => {
   it("has the JJ- prefix and 6 unambiguous chars", () => {
@@ -160,5 +165,26 @@ describe("orderPlanMatchesCart — the plan was paid for in the same total", () 
         { planId: "plus", planPriceCents: 29900 },
       ),
     ).toBe(false);
+  });
+});
+
+describe("canEditShipping — a typo is fixable until the parcel leaves", () => {
+  const order = (status: string, fulfillmentStatus: string) => ({ status, fulfillmentStatus });
+
+  it("allows it while the order is still here", () => {
+    expect(canEditShipping(order("PENDING", "UNFULFILLED"))).toBe(true);
+    expect(canEditShipping(order("PAID", "UNFULFILLED"))).toBe(true);
+    // Being printed is still here — this is when a typo is usually noticed.
+    expect(canEditShipping(order("PAID", "PROCESSING"))).toBe(true);
+  });
+
+  it("refuses once it is with a courier", () => {
+    expect(canEditShipping(order("PAID", "SHIPPED"))).toBe(false);
+    expect(canEditShipping(order("PAID", "DELIVERED"))).toBe(false);
+  });
+
+  it("refuses on a closed order, whatever its fulfilment says", () => {
+    expect(canEditShipping(order("CANCELLED", "UNFULFILLED"))).toBe(false);
+    expect(canEditShipping(order("REFUNDED", "PROCESSING"))).toBe(false);
   });
 });

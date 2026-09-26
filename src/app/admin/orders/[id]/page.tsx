@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { getStaffWith } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/money";
+import { ShippingForm } from "@/components/shipping-form";
+import { updateOrderShippingAction } from "../actions";
 import { intervalLabel } from "@/lib/subscription-periods";
 import { can } from "@/lib/permissions";
 import { printReadiness } from "@/lib/print";
@@ -179,17 +181,33 @@ export default async function AdminOrderDetailPage({
             </div>
           )}
 
-          {(order.shipName || order.shipAddress) && (
-            <div className="rounded-2xl border border-black/10 bg-white p-4 text-sm">
-              <h2 className="font-semibold">Shipping</h2>
+          {/* Editable, not just displayed: a mistyped address was previously
+              unfixable from either side, so the only outcomes were a lost
+              parcel or a refund. Changes are written to the activity log. */}
+          <div className="rounded-2xl border border-black/10 bg-white p-4 text-sm">
+            <h2 className="font-semibold">Shipping</h2>
+            {order.shipName || order.shipAddress ? (
               <p className="mt-1 text-black/70">
                 {[order.shipName, order.shipPhone, order.shipAddress, order.shipCity]
                   .filter(Boolean)
                   .join(" · ")}
               </p>
-              {order.shipNote && <p className="mt-1 text-black/50">{order.shipNote}</p>}
-            </div>
-          )}
+            ) : (
+              <p className="mt-1 text-black/50">No delivery address on this order.</p>
+            )}
+            <details className="mt-3">
+              <summary className="cursor-pointer text-xs font-medium text-black/50 hover:text-black">
+                Correct the address
+              </summary>
+              <div className="mt-3">
+                <ShippingForm
+                  action={updateOrderShippingAction.bind(null, order.id)}
+                  values={order}
+                  submitLabel="Save address"
+                />
+              </div>
+            </details>
+          </div>
         </div>
 
         <div className="rounded-2xl border border-black/10 bg-white p-4 h-fit">

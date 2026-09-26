@@ -1,46 +1,96 @@
 import Link from "next/link";
+import type { Prisma } from "@prisma/client";
 import { getStaffWith } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/money";
+import { pageParams } from "@/lib/pagination";
 import { Forbidden } from "@/components/admin/forbidden";
+import { Pagination } from "@/components/admin/pagination";
+import { SearchForm } from "@/components/admin/search-form";
 
 export const dynamic = "force-dynamic";
 
 const ORDER_STATUSES = ["PENDING", "PAID", "CANCELLED", "REFUNDED"] as const;
+type Status = (typeof ORDER_STATUSES)[number];
 
 export default async function AdminOrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; q?: string; page?: string }>;
 }) {
   if (!(await getStaffWith("orders.manage"))) return <Forbidden />;
-  const { status } = await searchParams;
-  const where = ORDER_STATUSES.includes(status as (typeof ORDER_STATUSES)[number])
-    ? { status: status as (typeof ORDER_STATUSES)[number] }
-    : {};
 
-  const orders = await prisma.order.findMany({
-    where,
-    include: { user: { select: { name: true, email: true } }, _count: { select: { items: true } } },
-    orderBy: { createdAt: "desc" },
-    take: 300,
-  });
+  const sp = await searchParams;
+  const status = ORDER_STATUSES.includes(sp.status as Status) ? (sp.status as Status) : undefined;
+  const q = sp.q?.trim() || undefined;
+  const { page, skip, take } = pageParams(sp.page);
+
+  const where: Prisma.OrderWhereInput = {
+    ...(status ? { status } : {}),
+    // An order is looked up by the number on the parcel, or by whoever is on
+    // the phone about it.
+    ...(q
+      ? {
+          OR: [
+            { orderNumber: { contains: q, mode: "insensitive" } },
+            { shipName: { contains: q, mode: "insensitive" } },
+            { shipPhone: { contains: q, mode: "insensitive" } },
+            { user: { email: { contains: q, mode: "insensitive" } } },
+            { user: { name: { contains: q, mode: "insensitive" } } },
+          ],
+        }
+      : {}),
+  };
+
+  // Paged, not truncated. This list used to stop at 300 rows with no way
+  // forward, which quietly put every older order out of reach of the console.
+  const [orders, total, byStatus] = await Promise.all([
+    prisma.order.findMany({
+      where,
+      include: { user: { select: { name: true, email: true } }, _count: { select: { items: true } } },
+      orderBy: { createdAt: "desc" },
+      skip,
+      take,
+    }),
+    prisma.order.count({ where }),
+    prisma.order.groupBy({ by: ["status"], _count: { _all: true } }),
+  ]);
+
+  const count = (s: string) => byStatus.find((g) => g.status === s)?._count._all ?? 0;
+  const all = byStatus.reduce((n, g) => n + g._count._all, 0);
+
+  // Changing a filter starts again at page one; the search rides along.
+  const href = (next?: Status) => {
+    const query = new URLSearchParams();
+    if (next) query.set("status", next);
+    if (q) query.set("q", q);
+    const qs = query.toString();
+    return qs ? `/admin/orders?${qs}` : "/admin/orders";
+  };
+
+  const chip = (on: boolean) =>
+    on ? "font-semibold" : "text-black/50 hover:underline";
 
   return (
     <div>
       <h1 className="text-2xl font-bold">Orders</h1>
 
-      <div className="mt-4 flex gap-2 text-sm">
-        <Link href="/admin/orders" className={!status ? "font-semibold" : "text-black/50 hover:underline"}>
-          All
+      <div className="mt-4">
+        <SearchForm
+          action="/admin/orders"
+          placeholder="Order number, customer, phone…"
+          defaultValue={q}
+          keep={{ status }}
+        />
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-3 text-sm">
+        <Link href={href()} className={chip(!status)}>
+          All <span className="text-black/40">({all})</span>
         </Link>
         {ORDER_STATUSES.map((s) => (
-          <Link
-            key={s}
-            href={`/admin/orders?status=${s}`}
-            className={status === s ? "font-semibold" : "text-black/50 hover:underline"}
-          >
-            {s}
+          <Link key={s} href={href(s)} className={chip(status === s)}>
+            {s} <span className="text-black/40">({count(s)})</span>
           </Link>
         ))}
       </div>
@@ -79,13 +129,15 @@ export default async function AdminOrdersPage({
             {orders.length === 0 && (
               <tr>
                 <td colSpan={6} className="py-8 px-4 text-center text-black/50">
-                  No orders.
+                  {q ? `No orders match “${q}”.` : "No orders."}
                 </td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
+
+      <Pagination basePath="/admin/orders" params={{ status, q }} page={page} total={total} />
     </div>
   );
 }
