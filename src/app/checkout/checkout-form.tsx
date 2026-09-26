@@ -72,7 +72,7 @@ export function CheckoutForm({
         {pending ? "Taking you to payment…" : "Continue to payment"}
       </button>
       <p className="text-center text-xs text-black/40">
-        You&apos;ll generate your QR codes as soon as the payment goes through.
+        Your QR codes are made as soon as the payment goes through.
       </p>
     </form>
   );

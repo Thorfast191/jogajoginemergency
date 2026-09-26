@@ -1,5 +1,14 @@
 import { describe, it, expect } from "vitest";
-import { parseCart, serializeCart, addLine, setLineQty, removeLine, cartCount, MAX_QTY } from "../cart";
+import {
+  parseCart,
+  parseCartPlan,
+  serializeCart,
+  addLine,
+  setLineQty,
+  removeLine,
+  cartCount,
+  MAX_QTY,
+} from "../cart";
 
 describe("parseCart — the cookie is user-controlled, so trust nothing", () => {
   it("reads a well-formed cart", () => {
@@ -74,5 +83,109 @@ describe("cart mutations", () => {
   it("round-trips through serialize/parse", () => {
     const lines = [{ slug: "a", qty: 2 }, { slug: "b", qty: 1 }];
     expect(parseCart(serializeCart(lines))).toEqual(lines);
+  });
+});
+
+describe("the chosen artwork is part of a line's identity", () => {
+  it("reads a theme off a line", () => {
+    expect(parseCart('{"l":[{"slug":"bike","qty":1,"theme":"good-boy"}],"p":null}')).toEqual([
+      { slug: "bike", qty: 1, theme: "good-boy" },
+    ]);
+  });
+
+  it("leaves theme off entirely when there isn't one", () => {
+    expect(parseCart('{"l":[{"slug":"bike","qty":1}],"p":null}')).toEqual([
+      { slug: "bike", qty: 1 },
+    ]);
+  });
+
+  it("drops a theme that isn't a usable slug", () => {
+    expect(parseCart('{"l":[{"slug":"bike","qty":1,"theme":7}],"p":null}')).toEqual([
+      { slug: "bike", qty: 1 },
+    ]);
+    expect(
+      parseCart(JSON.stringify({ l: [{ slug: "bike", qty: 1, theme: "x".repeat(500) }], p: null })),
+    ).toEqual([{ slug: "bike", qty: 1 }]);
+  });
+
+  it("keeps the same product in two themes as two lines", () => {
+    const lines = addLine(addLine([], "bike", 1, "good-boy"), "bike", 1, "speedster");
+    expect(lines).toEqual([
+      { slug: "bike", qty: 1, theme: "good-boy" },
+      { slug: "bike", qty: 1, theme: "speedster" },
+    ]);
+  });
+
+  it("accumulates only onto the matching theme", () => {
+    const lines = addLine(
+      [
+        { slug: "bike", qty: 1, theme: "good-boy" },
+        { slug: "bike", qty: 1 },
+      ],
+      "bike",
+      2,
+      "good-boy",
+    );
+    expect(lines).toEqual([
+      { slug: "bike", qty: 3, theme: "good-boy" },
+      { slug: "bike", qty: 1 },
+    ]);
+  });
+
+  it("merges duplicates per theme, not per slug", () => {
+    expect(
+      parseCart(
+        '{"l":[{"slug":"a","qty":2,"theme":"t1"},{"slug":"a","qty":3,"theme":"t1"},{"slug":"a","qty":1}],"p":null}',
+      ),
+    ).toEqual([
+      { slug: "a", qty: 5, theme: "t1" },
+      { slug: "a", qty: 1 },
+    ]);
+  });
+
+  it("removes and re-quantities the themed line only", () => {
+    const lines = [
+      { slug: "a", qty: 1, theme: "t1" },
+      { slug: "a", qty: 4 },
+    ];
+    expect(removeLine(lines, "a", "t1")).toEqual([{ slug: "a", qty: 4 }]);
+    expect(removeLine(lines, "a")).toEqual([{ slug: "a", qty: 1, theme: "t1" }]);
+    expect(setLineQty(lines, "a", 2, "t1")).toEqual([
+      { slug: "a", qty: 2, theme: "t1" },
+      { slug: "a", qty: 4 },
+    ]);
+  });
+});
+
+describe("parseCartPlan — a plan rides in the same cookie", () => {
+  it("reads the plan slug", () => {
+    expect(parseCartPlan('{"l":[],"p":"plus"}')).toBe("plus");
+  });
+
+  it("is null when there is none, or when it isn't a usable slug", () => {
+    expect(parseCartPlan('{"l":[],"p":null}')).toBeNull();
+    expect(parseCartPlan('{"l":[]}')).toBeNull();
+    expect(parseCartPlan('{"l":[],"p":""}')).toBeNull();
+    expect(parseCartPlan('{"l":[],"p":12}')).toBeNull();
+    expect(parseCartPlan(JSON.stringify({ l: [], p: "x".repeat(500) }))).toBeNull();
+  });
+
+  it("is null for absent, malformed and legacy cookies", () => {
+    for (const raw of [undefined, null, "", "not json", '[{"slug":"a","qty":1}]']) {
+      expect(parseCartPlan(raw)).toBeNull();
+    }
+  });
+
+  it("round-trips lines and a plan together", () => {
+    const lines = [{ slug: "a", qty: 2, theme: "t1" }, { slug: "b", qty: 1 }];
+    const raw = serializeCart(lines, "plus");
+    expect(parseCart(raw)).toEqual(lines);
+    expect(parseCartPlan(raw)).toBe("plus");
+  });
+});
+
+describe("cookies written before the cart carried a plan", () => {
+  it("still reads a bare array of lines", () => {
+    expect(parseCart('[{"slug":"bike","qty":2}]')).toEqual([{ slug: "bike", qty: 2 }]);
   });
 });

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getCustomer } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { slotBalanceForUser } from "@/lib/slots-server";
+import { orderReadiness } from "@/lib/print-server";
 import { userIsEntitled } from "@/lib/subscription";
 import { MascotCheer } from "@/components/illustrations";
 import { ButtonLinkClass } from "@/components/ui";
@@ -52,12 +53,26 @@ export default async function CheckoutSuccessPage({
     );
   }
 
-  const [balance, entitled] = await Promise.all([
+  const [balance, readiness, entitled, profile] = await Promise.all([
     slotBalanceForUser(user.id),
+    orderReadiness(order.id),
     userIsEntitled(user.id),
+    prisma.emergencyProfile.findUnique({
+      where: { userId: user.id },
+      select: { emergencyMessage: true, _count: { select: { contacts: true } } },
+    }),
   ]);
 
   const bought = order.items.reduce((n, i) => n + i.quantity * i.product.qrSlots, 0);
+  // Paying mints this order's codes (see src/lib/tag-issue.ts), so there is
+  // normally nothing to press here. Judged on *this* order, not the account
+  // balance: an unspent slot left over from an older purchase would otherwise
+  // make a finished order read as unfinished.
+  const missing = Math.max(0, readiness.needed - readiness.generated);
+  const ready = missing === 0;
+  // Slots on other orders the customer never used. Worth a nudge, not a step.
+  const elsewhere = Math.max(0, balance.available - missing);
+  const profileReady = !!profile && (!!profile.emergencyMessage || profile._count.contacts > 0);
 
   return (
     <div className="mx-auto max-w-xl px-4 py-16">
@@ -72,29 +87,45 @@ export default async function CheckoutSuccessPage({
       </p>
 
       <ol className="mt-8 space-y-3">
-        <Step n={1} title="Generate your QR codes" done={balance.available === 0}>
-          You have {balance.available} to make. Each is printed into the middle of your sticker, so
-          we print and ship as soon as they&apos;re done.
+        <Step
+          n={1}
+          title={ready ? "Your QR codes are made" : "Finish making your QR codes"}
+          done={ready}
+        >
+          {ready
+            ? "Nothing to do — we're printing them into the middle of your stickers and shipping them to you."
+            : `${missing} still to make. We print and ship as soon as they're done.`}
         </Step>
-        <Step n={2} title="Add your emergency information" done={false}>
+        <Step n={2} title="Add your emergency information" done={profileReady}>
           Blood group, allergies, who to call — and choose exactly what a finder sees.
         </Step>
         <Step n={3} title="Publish your page" done={entitled}>
           {entitled
-            ? "Your subscription is active, so your page is live."
-            : "A subscription is what makes your page show your information."}
+            ? "Your plan is active, so your page is live."
+            : "A plan is what makes your page show your information. You can add one any time."}
         </Step>
       </ol>
 
+      {elsewhere > 0 && (
+        <p className="mt-4 rounded-xl border border-black/10 bg-white px-4 py-3 text-sm text-black/60">
+          You also have {elsewhere} unused QR {elsewhere === 1 ? "code" : "codes"} from an earlier
+          order.{" "}
+          <Link href="/dashboard/tags" className="font-medium text-[var(--color-primary)] hover:underline">
+            Make {elsewhere === 1 ? "it" : "them"}
+          </Link>{" "}
+          whenever you like.
+        </p>
+      )}
+
       <div className="mt-8 flex flex-wrap gap-3">
-        <Link href="/dashboard/tags" className={ButtonLinkClass()}>
-          Generate my QR codes
+        <Link href="/dashboard/profile" className={ButtonLinkClass()}>
+          {profileReady ? "Review my information" : "Set up my information"}
         </Link>
         <Link
-          href="/dashboard/profile"
+          href="/dashboard/tags"
           className="rounded-xl border border-black/15 px-6 py-3 font-semibold hover:bg-black/5"
         >
-          Set up my information
+          {ready ? "See my QR codes" : "Generate my QR codes"}
         </Link>
       </div>
     </div>

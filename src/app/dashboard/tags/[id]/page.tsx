@@ -35,10 +35,11 @@ export default async function TagDetailPage({ params }: { params: Promise<{ id: 
       orderBy: { sortOrder: "asc" },
     }),
     entitledThemeIdsForUser(user.id),
-    // What a locked theme could be bought through, so the picker can point at
-    // the sticker instead of just refusing.
+    // What a locked theme could be bought through, so the picker can point at a
+    // sticker instead of just refusing. Any sticker can be bought in any
+    // artwork, so this is every one on sale, not only those carrying a theme.
     prisma.product.findMany({
-      where: { status: "ACTIVE", themeId: { not: null } },
+      where: { status: "ACTIVE" },
       select: { slug: true, name: true, themeId: true, priceCents: true },
     }),
   ]);

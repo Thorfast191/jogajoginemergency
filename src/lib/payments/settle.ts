@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { gatewayFor } from "./registry";
 import { amountMatches, nextPaymentStatus, paymentCoversOrder, type SettleStatus } from "./core";
@@ -26,7 +27,18 @@ export async function settlePayment(
   const payment = await prisma.payment.findUnique({
     where: { id: paymentId },
     include: {
-      order: { select: { id: true, orderNumber: true, status: true, totalCents: true, currency: true } },
+      order: {
+        select: {
+          id: true,
+          orderNumber: true,
+          status: true,
+          totalCents: true,
+          currency: true,
+          userId: true,
+          planId: true,
+          plan: { select: { intervalMonths: true } },
+        },
+      },
       subscription: {
         select: {
           id: true,
@@ -125,6 +137,18 @@ export async function settlePayment(
         where: { id: payment.order.id },
         data: { status: "PAID", placedAt: new Date() },
       });
+
+      // An order can carry a plan, bought in the same checkout. One payment
+      // covered both, so this is where the page is published — not a second
+      // trip to a gateway the customer never knew about.
+      if (payment.order.planId && payment.order.plan) {
+        await activateSubscription(tx, {
+          userId: payment.order.userId,
+          planId: payment.order.planId,
+          intervalMonths: payment.order.plan.intervalMonths,
+          provider: payment.provider,
+        });
+      }
     }
 
     if (payment.kind === "SUBSCRIPTION" && payment.subscription) {
@@ -151,4 +175,54 @@ export async function settlePayment(
     fulfilledOrderId:
       next === "SUCCEEDED" && payment.kind === "ORDER" ? payment.order?.id : undefined,
   };
+}
+
+/**
+ * Start or extend this customer's subscription, by the plan's own period.
+ *
+ * One row per customer across renewals, as `subscribeAction` does it, so their
+ * billing history stays on one record. A customer whose plan is still running
+ * keeps the days they already paid for — `extendPeriod` counts from the current
+ * end while it is ahead.
+ */
+async function activateSubscription(
+  tx: Prisma.TransactionClient,
+  params: {
+    userId: string;
+    planId: string;
+    intervalMonths: number;
+    provider: string;
+  },
+): Promise<void> {
+  const existing = await tx.subscription.findFirst({
+    where: { userId: params.userId },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, currentPeriodEnd: true },
+  });
+
+  const provider = params.provider as Prisma.SubscriptionCreateInput["provider"];
+  const now = new Date();
+
+  if (existing) {
+    await tx.subscription.update({
+      where: { id: existing.id },
+      data: {
+        planId: params.planId,
+        provider,
+        status: "ACTIVE",
+        currentPeriodEnd: extendPeriod(existing.currentPeriodEnd, params.intervalMonths, now),
+      },
+    });
+    return;
+  }
+
+  await tx.subscription.create({
+    data: {
+      userId: params.userId,
+      planId: params.planId,
+      provider,
+      status: "ACTIVE",
+      currentPeriodEnd: extendPeriod(new Date(0), params.intervalMonths, now),
+    },
+  });
 }

@@ -5,16 +5,20 @@ import { addToCartAction } from "@/app/cart/actions";
  * works without JavaScript and needs no client bundle.
  *
  * `then="checkout"` skips the cart page for a buy-now flow.
+ * `theme` is the artwork the buyer picked; left off, the line takes whichever
+ * theme the product carries.
  */
 export function AddToCartButton({
   slug,
   qty = 1,
+  theme,
   then,
   className,
   children,
 }: {
   slug: string;
   qty?: number;
+  theme?: string | null;
   then?: "cart" | "checkout";
   className?: string;
   children?: React.ReactNode;
@@ -23,6 +27,7 @@ export function AddToCartButton({
     <form action={addToCartAction}>
       <input type="hidden" name="slug" value={slug} />
       <input type="hidden" name="qty" value={qty} />
+      {theme && <input type="hidden" name="theme" value={theme} />}
       {then && <input type="hidden" name="then" value={then} />}
       <button
         type="submit"

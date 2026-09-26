@@ -5,8 +5,8 @@ import { Prisma } from "@prisma/client";
 import { requireCustomer } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { checkoutSchema, firstIssue } from "@/lib/validations";
-import { generateOrderNumber, orderMatchesCart } from "@/lib/order";
-import { readCart, resolveCart } from "@/lib/cart-server";
+import { generateOrderNumber, orderMatchesCart, orderPlanMatchesCart } from "@/lib/order";
+import { readResolvedCart } from "@/lib/cart-server";
 import { enabledGatewayFor } from "@/lib/payments/enabled";
 import { getSettings } from "@/lib/settings";
 import { appUrl } from "@/lib/payments/config";
@@ -23,6 +23,10 @@ export type CheckoutState = { error?: string };
  * (src/lib/payments/settle.ts) marks it PAID, which is what grants QR slots.
  * The cart is likewise cleared on settlement, not on redirect — a customer who
  * abandons the gateway comes back to a cart that still has their stickers in.
+ *
+ * The cart may also carry a plan. It is paid for in this one payment and
+ * activated by the same callback, so a customer never buys a sticker and then
+ * discovers that the page it opens costs again.
  */
 export async function createOrderAction(
   _prev: CheckoutState,
@@ -55,8 +59,13 @@ export async function createOrderAction(
 
   // Prices come from the database via resolveCart, never from the form or the
   // cookie: the cart carries slugs and quantities and nothing else.
-  const cart = await resolveCart(await readCart());
+  const cart = await readResolvedCart();
   if (cart.lines.length === 0) return { error: "Your cart is empty." };
+
+  const cartPlan = {
+    planId: cart.plan?.id ?? null,
+    planPriceCents: cart.plan?.priceCents ?? null,
+  };
 
   let gateway;
   try {
@@ -74,7 +83,11 @@ export async function createOrderAction(
   // Submitting the same form again resumes the order it created. That order is
   // what gets paid for, so the cart must still describe it: billing today's
   // cart against yesterday's order once let one sticker's price pay for five.
-  if (existing && !orderMatchesCart(existing.items, cart.lines)) {
+  if (
+    existing &&
+    (!orderMatchesCart(existing.items, cart.lines) ||
+      !orderPlanMatchesCart(existing, cartPlan))
+  ) {
     return { error: CART_CHANGED };
   }
 
@@ -99,9 +112,13 @@ export async function createOrderAction(
             idempotencyKey,
             userId: user.id,
             status: "PENDING",
-            subtotalCents: cart.totalCents,
+            // Subtotal is the goods; the total is what the gateway charges, so
+            // it carries the plan too.
+            subtotalCents: cart.goodsCents,
             totalCents: cart.totalCents,
             currency: cart.currency,
+            planId: cartPlan.planId,
+            planPriceCents: cartPlan.planPriceCents,
             shipName: parsed.data.shipName ?? null,
             shipPhone: parsed.data.shipPhone ?? null,
             shipAddress: parsed.data.shipAddress ?? null,
@@ -113,6 +130,7 @@ export async function createOrderAction(
                 quantity: line.qty,
                 unitPriceCents: line.unitPriceCents,
                 currency: line.currency,
+                themeId: line.themeId,
               })),
             },
           },
@@ -126,7 +144,9 @@ export async function createOrderAction(
       const winner = await findOwnOrderByKey(idempotencyKey, user.id);
       if (!winner) throw e;
       if (winner.status === "PAID") redirect(`/checkout/success?order=${winner.orderNumber}`);
-      if (!orderMatchesCart(winner.items, cart.lines)) return { error: CART_CHANGED };
+      if (!orderMatchesCart(winner.items, cart.lines) || !orderPlanMatchesCart(winner, cartPlan)) {
+        return { error: CART_CHANGED };
+      }
       orderId = winner.id;
       amount = { totalCents: winner.totalCents, currency: winner.currency };
     } else {
@@ -154,7 +174,9 @@ export async function createOrderAction(
       paymentId,
       amountCents: amount.totalCents,
       currency: amount.currency,
-      description: cart.lines.map((l) => l.name).join(", ").slice(0, 100),
+      description: [...cart.lines.map((l) => l.name), ...(cart.plan ? [`${cart.plan.name} plan`] : [])]
+        .join(", ")
+        .slice(0, 100),
       customer: { name: user.name, email: user.email },
       callbackUrl: `${appUrl()}/api/payments/callback?payment=${paymentId}`,
     });
@@ -199,7 +221,17 @@ async function findOwnOrderByKey(key: string, userId: string) {
       status: true,
       totalCents: true,
       currency: true,
-      items: { select: { productId: true, quantity: true, unitPriceCents: true, currency: true } },
+      planId: true,
+      planPriceCents: true,
+      items: {
+        select: {
+          productId: true,
+          quantity: true,
+          unitPriceCents: true,
+          currency: true,
+          themeId: true,
+        },
+      },
     },
   });
   return order && order.userId === userId ? order : null;

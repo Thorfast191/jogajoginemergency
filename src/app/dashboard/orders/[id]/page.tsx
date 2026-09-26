@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { getCustomer } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/money";
+import { intervalLabel } from "@/lib/subscription-periods";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,8 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const order = await prisma.order.findFirst({
     where: { id, userId: user.id },
     include: {
-      items: { include: { product: true, tags: true } },
+      plan: { select: { name: true, intervalMonths: true } },
+      items: { include: { product: true, theme: { select: { name: true } }, tags: true } },
       payments: { orderBy: { createdAt: "desc" } },
     },
   });
@@ -34,7 +36,14 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
         {order.items.map((item) => (
           <div key={item.id} className="rounded-lg border border-black/10 p-4">
             <div className="flex justify-between">
-              <span className="font-medium">{item.product.name}</span>
+              <span className="font-medium">
+                {item.product.name}
+                {item.theme && (
+                  <span className="block text-xs font-normal text-black/50">
+                    {item.theme.name} artwork
+                  </span>
+                )}
+              </span>
               <span>
                 {item.quantity} × {formatPrice(item.unitPriceCents, item.currency)}
               </span>
@@ -54,7 +63,22 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
       </div>
 
       <div className="mt-6 rounded-lg border border-black/10 p-4 text-sm">
-        <div className="flex justify-between font-semibold">
+        {/* An order can include a plan, so the total is not just the stickers. */}
+        {order.plan && order.planPriceCents !== null && (
+          <>
+            <div className="flex justify-between text-black/60">
+              <span>Stickers</span>
+              <span>{formatPrice(order.subtotalCents, order.currency)}</span>
+            </div>
+            <div className="flex justify-between text-black/60">
+              <span>
+                {order.plan.name} plan · {intervalLabel(order.plan.intervalMonths)}
+              </span>
+              <span>{formatPrice(order.planPriceCents, order.currency)}</span>
+            </div>
+          </>
+        )}
+        <div className="mt-1 flex justify-between border-t border-black/10 pt-1 font-semibold">
           <span>Total</span>
           <span>{formatPrice(order.totalCents, order.currency)}</span>
         </div>

@@ -4,6 +4,7 @@ import {
   entitledThemeIds,
   canUseTheme,
   unlockedBy,
+  cheapestSticker,
 } from "../theme-access";
 
 describe("entitledThemeIds", () => {
@@ -75,5 +76,30 @@ describe("unlockedBy", () => {
 describe("DEFAULT_THEME_SLUG", () => {
   it("is the well-known slug the seed and the renderer agree on", () => {
     expect(DEFAULT_THEME_SLUG).toBe("jogajog-emergency");
+  });
+});
+
+describe("cheapestSticker — the shortest route to a locked theme", () => {
+  const p = (slug: string, priceCents: number, themeId: string | null = null) => ({
+    slug,
+    name: slug,
+    themeId,
+    priceCents,
+  });
+
+  it("picks the lowest price, whatever theme it carries", () => {
+    expect(cheapestSticker([p("bike", 29900, "classic"), p("luggage", 24900, "web")])?.slug).toBe(
+      "luggage",
+    );
+  });
+
+  it("counts a sticker that carries no theme of its own", () => {
+    expect(cheapestSticker([p("bike", 29900, "classic"), p("plain", 19900, null)])?.slug).toBe(
+      "plain",
+    );
+  });
+
+  it("is null when nothing is on sale", () => {
+    expect(cheapestSticker([])).toBeNull();
   });
 });

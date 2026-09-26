@@ -7,8 +7,12 @@ export async function defaultTheme() {
 }
 
 /**
- * The theme ids this customer may apply: every theme carried by a product they
- * paid for, plus the default.
+ * The theme ids this customer may apply: every theme they paid for, plus the
+ * default.
+ *
+ * A line records the artwork the buyer chose at checkout; where it doesn't, the
+ * theme is the one its product carries. Choosing Good Boy on a bike sticker is
+ * therefore what unlocks Good Boy — the purchase is the entitlement either way.
  *
  * Read from paid order lines rather than from their tags, so deleting a tag
  * never costs someone a theme they bought.
@@ -17,13 +21,13 @@ export async function entitledThemeIdsForUser(userId: string): Promise<Set<strin
   const [lines, fallback] = await Promise.all([
     prisma.orderItem.findMany({
       where: { order: { userId, status: "PAID" } },
-      select: { product: { select: { themeId: true } } },
+      select: { themeId: true, product: { select: { themeId: true } } },
     }),
     defaultTheme(),
   ]);
 
   return entitledThemeIds(
-    lines.map((l) => ({ themeId: l.product.themeId })),
+    lines.map((l) => ({ themeId: l.themeId ?? l.product.themeId })),
     fallback?.id ?? null,
   );
 }

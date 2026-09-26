@@ -1,6 +1,7 @@
 import { NextResponse, after } from "next/server";
 import { settlePayment } from "@/lib/payments/settle";
 import { remindAboutNewOrder } from "@/lib/print-server";
+import { issueTagsForOrder } from "@/lib/tag-issue";
 import { appUrl } from "@/lib/payments/config";
 import { cookies } from "next/headers";
 import { CART_COOKIE } from "@/lib/cart";
@@ -65,10 +66,29 @@ async function handle(req: Request): Promise<Response> {
       (await cookies()).delete(CART_COOKIE);
     }
 
-    // Stickers are printed with the customer's QR in them, so a newly paid
-    // order is waiting on the customer. Told once, by the call that paid it,
-    // and after the redirect has gone out so the gateway isn't kept waiting.
+    // Stickers are printed with the customer's QR in them, so the codes are
+    // minted the moment the order is paid: the customer finds them ready
+    // instead of being asked to press a button, and the order is printable
+    // straight away.
+    //
+    // Awaited rather than deferred, because the very next page the customer
+    // sees says how many codes they have. `after()` runs once the response has
+    // gone out, which is a race the success page loses. The work is bounded by
+    // the slots the order paid for and each code is its own short transaction;
+    // a provider that retries the callback meanwhile costs nothing, since both
+    // settlement and issuing are idempotent.
     const paidOrderId = outcome.fulfilledOrderId;
+    if (paidOrderId) {
+      try {
+        await issueTagsForOrder(paidOrderId);
+      } catch (e) {
+        console.error(`[payments] issuing QR codes failed for order ${paidOrderId}:`, e);
+      }
+    }
+
+    // The reminder sends nothing when an order needs no more codes, so after
+    // the step above it only speaks up if issuing them failed. Deferred: an
+    // email must not keep the gateway waiting.
     if (paidOrderId) {
       after(() =>
         remindAboutNewOrder(paidOrderId).catch((e) =>

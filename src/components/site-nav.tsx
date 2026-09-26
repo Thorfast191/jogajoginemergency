@@ -19,7 +19,7 @@ export async function SiteNav() {
   // role change, and pointing "Dashboard" at /admin for someone who was just
   // demoted sends them on a pointless trip through the login page.
   const [user, cart, settings] = await Promise.all([requireActiveUser(), readLiveCart(), getSettings()]);
-  const count = cartCount(cart);
+  const count = cartCount(cart.lines);
 
   const account: NavItem[] = user
     ? [{ href: isStaff(user.role) ? "/admin" : "/dashboard", label: "Dashboard" }]

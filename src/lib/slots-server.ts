@@ -39,6 +39,7 @@ export async function paidLineCapacities(userId: string): Promise<LineCapacity[]
       id: true,
       quantity: true,
       productId: true,
+      themeId: true,
       product: { select: { qrSlots: true, themeId: true } },
       tags: { select: { isReplacement: true } },
     },
@@ -47,7 +48,9 @@ export async function paidLineCapacities(userId: string): Promise<LineCapacity[]
   return lines.map((l) => ({
     orderItemId: l.id,
     productId: l.productId,
-    themeId: l.product.themeId,
+    // The artwork the buyer picked at checkout, else the product's own — a
+    // line bought before the shop offered the choice has none.
+    themeId: l.themeId ?? l.product.themeId,
     quantity: l.quantity,
     qrSlots: l.product.qrSlots,
     tagsUsed: l.tags.filter((t) => !t.isReplacement).length,

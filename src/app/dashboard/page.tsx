@@ -72,7 +72,7 @@ export default async function DashboardPage({
   const steps: Step[] = [
     { title: "Fill in your emergency profile", body: "A message for finders, and who to call.", done: profileReady, href: "/dashboard/profile", cta: "Open profile" },
     { title: "Buy a sticker", body: "Pick one in the theme you like.", done: paidOrders > 0, href: "/shop", cta: "Visit the shop" },
-    { title: "Generate your QR codes", body: "We print them into the middle of your stickers.", done: balance.owned > 0 && balance.available === 0, href: "/dashboard/tags", cta: "Generate" },
+    { title: "Get your QR codes", body: "Made for you when you pay — we print them into the middle of your stickers.", done: balance.owned > 0 && balance.available === 0, href: "/dashboard/tags", cta: balance.available > 0 ? "Generate" : "See them" },
     { title: "Publish your page", body: "A plan shows your information when someone scans.", done: entitled, href: "/dashboard/subscription", cta: "Choose a plan" },
   ];
   const done = steps.filter((s) => s.done).length;

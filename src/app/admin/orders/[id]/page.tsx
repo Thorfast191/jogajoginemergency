@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getStaffWith } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/money";
+import { intervalLabel } from "@/lib/subscription-periods";
 import { can } from "@/lib/permissions";
 import { printReadiness } from "@/lib/print";
 import { Forbidden } from "@/components/admin/forbidden";
@@ -24,10 +25,12 @@ export default async function AdminOrderDetailPage({
     where: { id },
     include: {
       user: { select: { id: true, name: true, email: true } },
+      plan: { select: { name: true, intervalMonths: true } },
       items: {
         orderBy: { id: "asc" },
         include: {
           product: true,
+          theme: { select: { name: true } },
           tags: {
             orderBy: { createdAt: "asc" },
             include: { theme: { select: { name: true } } },
@@ -113,7 +116,8 @@ export default async function AdminOrderDetailPage({
               <p className="mt-0.5 text-xs text-black/50">
                 {item.quantity * item.product.qrSlots} QR code
                 {item.quantity * item.product.qrSlots === 1 ? "" : "s"} · printed{" "}
-                {item.product.stickerWidthMm} mm wide
+                {item.product.stickerWidthMm} mm wide · {item.theme?.name ?? "product default"}{" "}
+                artwork
               </p>
 
               {item.tags.length === 0 ? (
@@ -189,9 +193,26 @@ export default async function AdminOrderDetailPage({
         </div>
 
         <div className="rounded-2xl border border-black/10 bg-white p-4 h-fit">
-          <p className="text-sm">
-            Total: <span className="font-semibold">{formatPrice(order.totalCents, order.currency)}</span>
-          </p>
+          {/* Broken out because an order can carry a plan, so the total is not
+              the sum of the sticker lines. */}
+          <dl className="space-y-1 text-sm">
+            <div className="flex justify-between gap-3">
+              <dt className="text-black/50">Stickers</dt>
+              <dd>{formatPrice(order.subtotalCents, order.currency)}</dd>
+            </div>
+            {order.plan && order.planPriceCents !== null && (
+              <div className="flex justify-between gap-3">
+                <dt className="text-black/50">
+                  {order.plan.name} plan · {intervalLabel(order.plan.intervalMonths)}
+                </dt>
+                <dd>{formatPrice(order.planPriceCents, order.currency)}</dd>
+              </div>
+            )}
+            <div className="flex justify-between gap-3 border-t border-black/10 pt-1">
+              <dt>Total</dt>
+              <dd className="font-semibold">{formatPrice(order.totalCents, order.currency)}</dd>
+            </div>
+          </dl>
           <div className="mt-4">
             <OrderControls
               orderId={order.id}

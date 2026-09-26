@@ -57,8 +57,11 @@ export function canUseTheme(themeId: string | null, entitled: ReadonlySet<string
 }
 
 /**
- * The cheapest product that would unlock a theme, so the picker can say
- * "comes with the Bike QR Sticker" rather than just refusing.
+ * The cheapest product that carries a theme as its own.
+ *
+ * Kept for anywhere that needs to name the sticker a theme belongs to. It is no
+ * longer how a theme is unlocked: the shop lets any sticker be bought in any
+ * artwork, so `cheapestSticker` is what the picker points at.
  */
 export function unlockedBy(
   themeId: string,
@@ -67,6 +70,20 @@ export function unlockedBy(
   let best: UnlockingProduct | null = null;
   for (const p of products) {
     if (p.themeId !== themeId) continue;
+    if (!best || p.priceCents < best.priceCents) best = p;
+  }
+  return best;
+}
+
+/**
+ * The cheapest sticker on sale — the shortest route to any locked theme, now
+ * that the artwork is chosen at checkout rather than fixed to the product.
+ */
+export function cheapestSticker(
+  products: readonly UnlockingProduct[],
+): UnlockingProduct | null {
+  let best: UnlockingProduct | null = null;
+  for (const p of products) {
     if (!best || p.priceCents < best.priceCents) best = p;
   }
   return best;

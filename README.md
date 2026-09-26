@@ -3,9 +3,9 @@
 Two connected products:
 
 1. **A QR-sticker store.** Customers buy physical, themed stickers (bike, car, luggage,
-   helmet) with a **one-time payment**. Every sticker's artwork leaves an empty square in the
-   middle; the customer generates their own QR code in the client area, and it is printed
-   into that square.
+   helmet) with a **one-time payment**, choosing the artwork at checkout. Every sticker's
+   artwork leaves an empty square in the middle; the customer's own QR code is printed into
+   that square.
 2. **An emergency-profile SaaS.** The account, the emergency profile, per-field privacy, and
    the public page a finder or first responder lands on when they scan. A **plan
    (subscription)** is what publishes that page.
@@ -16,9 +16,16 @@ Two connected products:
 
 - Buying a sticker grants **QR slots** — the right to generate that many codes
   (`src/lib/slots.ts`). There is no pre-minted inventory.
-- The customer generates each QR in the client area. We composite it into the centre of the
-  sticker's theme artwork, print it and ship it; the customer can also download the finished
-  sticker (PNG, or a real-size PDF) to reprint.
+- **Paying mints that order's codes** (`issueTagsForOrder` in `src/lib/tag-issue.ts`), so the
+  order is printable at once and the customer has nothing to press. Scoped to the order that
+  was paid: an unspent slot from an older purchase is left alone, because a permanent printed
+  link is not a side effect to hand someone. The Generate button in the client area stays for
+  what that leaves — a slot freed by deleting a code, or an order whose issue failed.
+- We composite each code into the centre of the sticker's theme artwork, print it and ship it;
+  the customer can also download the finished sticker (PNG, or a real-size PDF) to reprint.
+- A plan can be added to the sticker's own checkout (`Order.planId`), so publishing the page is
+  one payment rather than a second one discovered afterwards. The same verified callback that
+  marks the order paid activates the subscription.
 - Without an active plan a scan reaches a **dormant page**: nothing about the owner is shown,
   but the anonymous relay stays open so a found item can still be returned. That is one named
   constant, `LAPSED_BEHAVIOUR` in `src/lib/entitlements.ts`.
@@ -28,7 +35,12 @@ Two connected products:
 
 ## Themed stickers
 
-A `Theme` is the artwork printed on a sticker and the skin of the scan page.
+A `Theme` is the artwork printed on a sticker and the skin of the scan page. **The buyer picks
+it at checkout** — any sticker can be bought in any live theme, and the choice is recorded on
+the order line (`OrderItem.themeId`, falling back to `Product.themeId` for lines bought before
+the shop offered the choice). Buying a sticker in a theme is what unlocks that theme on the
+account (`src/lib/theme-access.ts`), so the picker links a locked one to the cheapest sticker
+with it already selected.
 
 - `Theme.qrBoxSize` (20–80, default 40) is the empty square's side as a percentage of the
   artwork's **shorter** edge. The square is always centred (`src/lib/sticker-layout.ts`).
@@ -48,8 +60,9 @@ A `Theme` is the artwork printed on a sticker and the skin of the scan page.
 | `/api/themes/[id]/preview` | public for live themes | sample QR pointing at `/demo` |
 
 **Print flow.** A paid order can't move to *Processing* until every QR on it is generated
-(`printReadiness` in `src/lib/print.ts`). When an order is paid the customer is emailed to
-generate their codes; staff can resend the reminder once a day from the order page.
+(`printReadiness` in `src/lib/print.ts`) — which paying normally satisfies on the spot. The
+reminder email sends nothing when an order needs no more codes, so it now only speaks up if
+automatic issuing failed; staff can resend it once a day from the order page.
 
 The Docker runner installs `font-dejavu` so librsvg renders generated artwork's text.
 
@@ -152,6 +165,8 @@ callbacks are built from it. If port 3000 is taken, run `npm run dev -- -p 3100`
   Activity log, My profile.
 - `src/lib/session.ts` — `requireActiveUser`, `getAdmin`, `getStaffWith`, `requirePermission`,
   `getCustomer`, `requireCustomer`.
+- `src/lib/tag-issue.ts` — the one place a purchased slot becomes a code, for both the automatic
+  path and the Generate button.
 - `src/lib/` rules, each with tests: `permissions`, `admin-guards`, `token-freshness`,
   `entitlements`, `subscription-periods`, `slots`, `print`, `sticker-layout`, `theme-access`,
   `public-profile`, `privacy`, `media-access`, `gateway-filter`, `pagination`, `daily`, `cart`,
@@ -194,10 +209,17 @@ warnings (7, 1 and 0 days), prunes rate-limit counters and drops notification ro
 
 ## Cart & checkout
 
-The cart is an `httpOnly` cookie of `[{ slug, qty }]`; prices are always re-read at checkout.
-Checkout creates a `PENDING` order and hands off to the chosen gateway; `Order.idempotencyKey`
-makes a double-submit return the original order. When orders are paused in settings, the cart
-and checkout say so and the checkout action refuses.
+The cart is an `httpOnly` cookie of `{ l: [{ slug, qty, theme }], p: planSlug }` — a bare
+`[{ slug, qty }]` array from an older deploy is still read. Prices, themes and the plan are
+always re-read from the database at checkout, so a tampered cookie can only choose *what*, never
+*what it costs*. The same product in two themes is two lines.
+
+Checkout creates a `PENDING` order and hands off to the chosen gateway;
+`Order.idempotencyKey` makes a double-submit return the original order, and `orderMatchesCart`
+plus `orderPlanMatchesCart` refuse to bill a changed cart against it — including a plan or a
+theme swapped in after the order was priced. `Order.subtotalCents` is the stickers;
+`totalCents` adds the plan. When orders are paused in settings, the cart and checkout say so
+and the checkout action refuses.
 
 ## Tag lifecycle
 
@@ -241,6 +263,8 @@ without spending a slot but can never move a tag between accounts.
 - **Live gateway sandbox runs** — needs merchant credentials.
 - **Automatic renewal** — plans are renewed by the customer; expiry warnings come from the
   maintenance job.
+- **An order-confirmation email** — paying now issues the codes, so the QR reminder that used to
+  follow a purchase stays quiet. Nothing else takes its place.
 - **SMS** — everything is email; `src/lib/notify/transport.ts` is where a second channel goes.
 - **Courier integration** — fulfilment is tracked by hand.
 - **Legal review** of the Privacy and Terms pages.

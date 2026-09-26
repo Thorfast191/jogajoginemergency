@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { themeCssVars, type ThemeSkin } from "@/lib/themes";
 import { ThemeMascot } from "@/components/illustrations";
-import { unlockedBy, type UnlockingProduct } from "@/lib/theme-access";
+import { cheapestSticker, type UnlockingProduct } from "@/lib/theme-access";
 import { setTagThemeAction } from "./actions";
 
 type Option = ThemeSkin & { id: string };
@@ -9,10 +9,12 @@ type Option = ThemeSkin & { id: string };
 /**
  * Skin picker for one tag.
  *
- * A theme comes with the sticker product that carries it, so a theme the
- * customer has not bought is shown locked rather than hidden — seeing what a
- * Helmet sticker would look like is the reason to buy one. The server refuses
- * unowned themes regardless of what this renders.
+ * A theme comes with a sticker bought in it, so a theme the customer has not
+ * bought is shown locked rather than hidden — seeing what Night Guardian would
+ * look like is the reason to buy one. The shop lets any sticker be bought in
+ * any artwork, so a locked theme links to the cheapest sticker with that theme
+ * already selected. The server refuses unowned themes regardless of what this
+ * renders.
  */
 export function ThemePicker({
   tagId,
@@ -40,7 +42,7 @@ export function ThemePicker({
         {themes.map((theme) => {
           const current = theme.id === currentThemeId;
           const unlocked = owned.has(theme.id);
-          const seller = unlocked ? null : unlockedBy(theme.id, products);
+          const seller = unlocked ? null : cheapestSticker(products);
 
           return (
             <div
@@ -84,11 +86,11 @@ export function ThemePicker({
                   </form>
                 ) : seller ? (
                   <Link
-                    href={`/shop/${seller.slug}`}
+                    href={`/shop/${seller.slug}?theme=${theme.slug}`}
                     className="mt-1 block truncate rounded-lg bg-black/5 py-1 text-center text-xs font-medium text-black/60 hover:bg-black/10"
-                    title={`Comes with the ${seller.name}`}
+                    title={`Buy a sticker in the ${theme.name} theme`}
                   >
-                    Comes with {seller.name}
+                    Buy in this theme
                   </Link>
                 ) : (
                   <p className="mt-1 text-center text-xs text-black/40">Not for sale</p>

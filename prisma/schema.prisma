@@ -208,6 +208,7 @@ model SubscriptionPlan {
   createdAt      DateTime @default(now())
 
   subscriptions Subscription[]
+  orders        Order[]
 }
 
 model Subscription {
@@ -259,9 +260,10 @@ model Theme {
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
 
-  artAsset MediaAsset? @relation("ThemeArt", fields: [artAssetId], references: [id])
-  products Product[]
-  tags     Tag[]
+  artAsset   MediaAsset? @relation("ThemeArt", fields: [artAssetId], references: [id])
+  products   Product[]
+  tags       Tag[]
+  orderItems OrderItem[]
 
   @@index([status, sortOrder])
 }
@@ -315,10 +317,17 @@ model Order {
   // Tags are reserved when the order is created and released again if the
   // customer never comes back from the gateway.
   reservationExpiresAt DateTime?
+  // A plan the customer added to this same checkout, so publishing their page
+  // is one payment rather than a second trip through a gateway. The price is
+  // copied in, like an OrderItem's, because the plan's own price may change
+  // later and this order was paid at today's.
+  planId               String?
+  planPriceCents       Int?
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
 
-  user     User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan     SubscriptionPlan? @relation(fields: [planId], references: [id])
   items    OrderItem[]
   payments Payment[]
 
@@ -327,15 +336,20 @@ model Order {
 }
 
 model OrderItem {
-  id             String @id @default(cuid())
+  id             String  @id @default(cuid())
   orderId        String
   productId      String
-  quantity       Int    @default(1)
+  quantity       Int     @default(1)
   unitPriceCents Int
-  currency       String @default("BDT")
+  currency       String  @default("BDT")
+  // The artwork the buyer chose for this line. Null means "whatever the
+  // product carries" — which is what every line bought before the shop let
+  // people choose, so it must stay a valid answer.
+  themeId        String?
 
   order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id])
+  theme   Theme?  @relation(fields: [themeId], references: [id])
   tags    Tag[]
 
   @@index([orderId])

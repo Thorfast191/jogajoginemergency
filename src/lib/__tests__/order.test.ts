@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { generateOrderNumber, orderMatchesCart } from "../order";
+import { generateOrderNumber, orderMatchesCart, orderPlanMatchesCart } from "../order";
 
 describe("generateOrderNumber", () => {
   it("has the JJ- prefix and 6 unambiguous chars", () => {
@@ -54,5 +54,111 @@ describe("orderMatchesCart — retrying a checkout must buy what was ordered", (
   it("never matches an empty cart", () => {
     expect(orderMatchesCart([item("a", 1)], [])).toBe(false);
     expect(orderMatchesCart([], [])).toBe(false);
+  });
+});
+
+describe("orderMatchesCart — the artwork is part of what was bought", () => {
+  const item = (productId: string, themeId: string | null) => ({
+    productId,
+    quantity: 1,
+    unitPriceCents: 29900,
+    currency: "BDT",
+    themeId,
+  });
+  const line = (productId: string, themeId: string | null) => ({
+    productId,
+    qty: 1,
+    unitPriceCents: 29900,
+    currency: "BDT",
+    themeId,
+  });
+
+  it("matches when the same theme was chosen", () => {
+    expect(orderMatchesCart([item("a", "t1")], [line("a", "t1")])).toBe(true);
+  });
+
+  it("does not match when the theme was swapped after the order was placed", () => {
+    // Ships one artwork, unlocks another.
+    expect(orderMatchesCart([item("a", "t1")], [line("a", "t2")])).toBe(false);
+  });
+
+  it("does not match when a theme was added or dropped", () => {
+    expect(orderMatchesCart([item("a", null)], [line("a", "t1")])).toBe(false);
+    expect(orderMatchesCart([item("a", "t1")], [line("a", null)])).toBe(false);
+  });
+
+  it("treats absent and null as the same answer", () => {
+    expect(
+      orderMatchesCart(
+        [{ productId: "a", quantity: 1, unitPriceCents: 29900, currency: "BDT" }],
+        [line("a", null)],
+      ),
+    ).toBe(true);
+  });
+
+  it("tells two lines of one product apart by their themes", () => {
+    expect(
+      orderMatchesCart([item("a", "t1"), item("a", "t2")], [line("a", "t2"), line("a", "t1")]),
+    ).toBe(true);
+    expect(
+      orderMatchesCart([item("a", "t1"), item("a", "t1")], [line("a", "t1"), line("a", "t2")]),
+    ).toBe(false);
+  });
+});
+
+describe("orderPlanMatchesCart — the plan was paid for in the same total", () => {
+  it("matches when neither side has a plan", () => {
+    expect(
+      orderPlanMatchesCart(
+        { planId: null, planPriceCents: null },
+        { planId: null, planPriceCents: null },
+      ),
+    ).toBe(true);
+  });
+
+  it("matches the same plan at the same price", () => {
+    expect(
+      orderPlanMatchesCart(
+        { planId: "plus", planPriceCents: 49900 },
+        { planId: "plus", planPriceCents: 49900 },
+      ),
+    ).toBe(true);
+  });
+
+  it("does not match when a plan was added after the order was placed", () => {
+    // The underpayment: the order's total never included a plan.
+    expect(
+      orderPlanMatchesCart(
+        { planId: null, planPriceCents: null },
+        { planId: "plus", planPriceCents: 49900 },
+      ),
+    ).toBe(false);
+  });
+
+  it("does not match when the plan was removed", () => {
+    expect(
+      orderPlanMatchesCart(
+        { planId: "plus", planPriceCents: 49900 },
+        { planId: null, planPriceCents: null },
+      ),
+    ).toBe(false);
+  });
+
+  it("does not match a different plan", () => {
+    expect(
+      orderPlanMatchesCart(
+        { planId: "plus", planPriceCents: 49900 },
+        { planId: "basic", planPriceCents: 49900 },
+      ),
+    ).toBe(false);
+  });
+
+  it("does not match when the plan's price changed since the order was placed", () => {
+    expect(
+      orderPlanMatchesCart(
+        { planId: "plus", planPriceCents: 49900 },
+        { planId: "plus", planPriceCents: 29900 },
+      ),
+    ).toBe(false);
   });
 });
