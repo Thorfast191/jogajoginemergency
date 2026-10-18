@@ -18,8 +18,10 @@ export default function PrivacyPage() {
         <p>
           Only the fields you switched on in your privacy settings, and only while your plan is
           active. Each field — name, photo, blood group, allergies, medical notes, contacts, bio,
-          links — has its own switch. Without an active plan, the page shows none of your
-          information; a finder can still send you a message.
+          links — has its own switch. A new profile starts private: only your emergency message is
+          shown until you switch more on. Before emergency contacts, medical details or a phone
+          number go public we ask you to confirm, and we record when you did. Without an active
+          plan, the page shows none of your information; a finder can still send you a message.
         </p>
         <p>
           Your account email and phone number are never shown on a scan page. Finders reach you
@@ -71,7 +73,7 @@ export default function PrivacyPage() {
 
       <ContentSection title="Your choices">
         <p>
-          Change what is public, mark a tag lost, delete a QR code, or update your details at any
+          Change what is public, mark a tag lost, switch a QR code off, or update your details at any
           time from your dashboard. To delete your account and its data, please{" "}
           <Link href="/contact" className="font-semibold text-[var(--color-primary)] hover:underline">
             contact us

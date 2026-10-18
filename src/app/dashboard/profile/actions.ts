@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireCustomer } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { emergencyProfileSchema, emergencyContactSchema, profileLinkSchema, bioSchema, firstIssue } from "@/lib/validations";
-import { PRESET_FLAGS } from "@/lib/privacy";
+import { DEFAULT_PRESET, PRESET_FLAGS } from "@/lib/privacy";
 import { processImage, MediaError } from "@/lib/media";
 import { ensureProfile } from "@/lib/profile";
 import { MAX_IMAGE_BYTES, oversizeMessage } from "@/lib/upload-limits";
@@ -57,8 +57,8 @@ export async function updateEmergencyProfileAction(
     },
     create: {
       userId: user.id,
-      visibilityPreset: "STANDARD",
-      ...PRESET_FLAGS.STANDARD,
+      visibilityPreset: DEFAULT_PRESET,
+      ...PRESET_FLAGS[DEFAULT_PRESET],
       displayName: d.displayName ?? null,
       emergencyMessage: d.emergencyMessage ?? null,
       bloodGroup: d.bloodGroup || null,

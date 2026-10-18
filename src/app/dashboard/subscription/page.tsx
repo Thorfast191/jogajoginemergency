@@ -6,7 +6,8 @@ import { formatPrice } from "@/lib/money";
 import { activeSubscriptionStatus } from "@/lib/subscription";
 import { PageHeader, Badge, Card } from "@/components/ui";
 import { MascotCheer, MascotThink } from "@/components/illustrations";
-import { subscribeAction, cancelSubscriptionAction } from "./actions";
+import { subscribeAction, cancelSubscriptionAction, resumeSubscriptionAction } from "./actions";
+import { endsWithoutRenewal } from "@/lib/subscription-periods";
 import { enabledGateways } from "@/lib/payments/enabled";
 import { intervalLabel } from "@/lib/subscription-periods";
 import { PaymentNotice } from "@/components/payment-notice";
@@ -86,15 +87,36 @@ export default async function SubscriptionPage({
 Your QR codes scan, but they don&apos;t show your information yet.
               </p>
             )}
-            {entitled && (
-              <form action={cancelSubscriptionAction} className="mt-3">
-                <button
-                  type="submit"
-                  className="rounded-lg border border-black/15 px-3 py-1.5 text-xs font-medium hover:bg-black/5"
-                >
-                  Cancel subscription
-                </button>
-              </form>
+            {entitled && subscription && endsWithoutRenewal(subscription, new Date()) ? (
+              <div className="mt-3">
+                <p className="text-sm text-amber-800">
+                  Cancelled. Your page stays live until{" "}
+                  {subscription.currentPeriodEnd.toLocaleDateString()}, then it stops showing your
+                  information.
+                </p>
+                <form action={resumeSubscriptionAction} className="mt-2">
+                  <button
+                    type="submit"
+                    className="rounded-lg border border-black/15 px-3 py-1.5 text-xs font-medium hover:bg-black/5"
+                  >
+                    Keep my plan
+                  </button>
+                </form>
+              </div>
+            ) : (
+              entitled && (
+                <form action={cancelSubscriptionAction} className="mt-3">
+                  <button
+                    type="submit"
+                    className="rounded-lg border border-black/15 px-3 py-1.5 text-xs font-medium hover:bg-black/5"
+                  >
+                    Cancel subscription
+                  </button>
+                  <p className="mt-1 text-xs text-black/50">
+                    You keep the time you&apos;ve paid for; your page stays live until it runs out.
+                  </p>
+                </form>
+              )
             )}
           </div>
         </div>

@@ -2,6 +2,15 @@
 
 import { useState } from "react";
 
+// One tap for the common cases, so a stranger in a hurry doesn't have to
+// compose a message. Each one is just a starting text they can still edit.
+const REASONS = [
+  "You may be blocking access. Please move your vehicle.",
+  "Please check your parking.",
+  "There may be a minor incident with your vehicle.",
+  "I've found something of yours.",
+];
+
 export function RelayForm({ shortCode }: { shortCode: string }) {
   const [finderContact, setFinderContact] = useState("");
   const [message, setMessage] = useState("");
@@ -37,16 +46,43 @@ export function RelayForm({ shortCode }: { shortCode: string }) {
     }
   }
 
+  // Only shown once the server has saved the message. It says what we know —
+  // the message is waiting for the owner — and not what we don't: that they
+  // have read it, or will reply.
   if (status === "sent") {
     return (
-      <p className="text-sm text-emerald-700 text-center bg-emerald-50 rounded-md px-3 py-3">
-        Thanks! Your message was sent to the owner — they&apos;ll be in touch.
-      </p>
+      <div role="status" className="text-sm text-emerald-800 text-center bg-emerald-50 rounded-md px-3 py-3">
+        <p className="font-semibold">Message saved for the owner</p>
+        <p className="mt-1">
+          It&apos;s waiting in their Jogajog account and we&apos;ve tried to email them. We can&apos;t
+          tell when they&apos;ll read it. If anyone is hurt, call 999.
+        </p>
+      </div>
     );
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
+      <fieldset>
+        <legend className="block text-sm font-medium mb-1">Pick a reason</legend>
+        <div className="flex flex-wrap gap-2">
+          {REASONS.map((r) => (
+            <button
+              key={r}
+              type="button"
+              onClick={() => setMessage(r)}
+              aria-pressed={message === r}
+              className={`rounded-full border px-3 py-1.5 text-left text-xs ${
+                message === r
+                  ? "border-[var(--skin-accent)] bg-[var(--skin-accent)]/10 font-semibold"
+                  : "border-[var(--skin-line)]"
+              }`}
+            >
+              {r}
+            </button>
+          ))}
+        </div>
+      </fieldset>
       <div>
         <label className="block text-sm font-medium mb-1" htmlFor="finderContact">
           Your phone or email (so the owner can reply)
@@ -61,7 +97,7 @@ export function RelayForm({ shortCode }: { shortCode: string }) {
       </div>
       <div>
         <label className="block text-sm font-medium mb-1" htmlFor="message">
-          Message
+          Message (or write your own)
         </label>
         <textarea
           id="message"
@@ -69,7 +105,7 @@ export function RelayForm({ shortCode }: { shortCode: string }) {
           rows={3}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
-          placeholder="e.g. I found your bag at Dhaka airport, gate 3."
+          placeholder="e.g. Your car is blocking the gate at house 12."
           className="w-full rounded-lg border border-[var(--skin-line)] bg-[var(--skin-surface)] px-3 py-2 text-sm text-[var(--skin-ink)]"
         />
       </div>

@@ -32,6 +32,7 @@ export default async function DemoPage({
   return (
     <ScanLayout
       skin={skin}
+      demo
       notice={
         <div className="mb-5 rounded-2xl bg-[var(--skin-surface)] px-4 py-3 text-center text-xs shadow-sm ring-1 ring-[var(--skin-line)]">
           <p className="font-semibold">This is a demo with sample information.</p>

@@ -109,16 +109,29 @@ export async function subscribeAction(formData: FormData): Promise<void> {
 }
 
 /**
- * Cancel. The period end is deliberately left alone, so the customer keeps
- * what they paid for until it runs out — `activeSubscriptionStatus` only counts
- * ACTIVE/TRIALING rows, so flipping the status is what ends entitlement.
+ * Cancel. Nothing renews, but the page stays live until the period the customer
+ * paid for runs out: the status is left alone (so `entitledWhere` still counts
+ * it) and only `cancelAtPeriodEnd` is set. Paying again clears it.
  */
 export async function cancelSubscriptionAction(): Promise<void> {
   const user = await requireCustomer();
 
   await prisma.subscription.updateMany({
     where: { userId: user.id, status: { in: ["ACTIVE", "TRIALING"] } },
-    data: { status: "CANCELED" },
+    data: { cancelAtPeriodEnd: true },
+  });
+
+  revalidatePath("/dashboard/subscription");
+  revalidatePath("/dashboard");
+}
+
+/** Undo a cancellation while the paid period is still running. */
+export async function resumeSubscriptionAction(): Promise<void> {
+  const user = await requireCustomer();
+
+  await prisma.subscription.updateMany({
+    where: { userId: user.id, status: { in: ["ACTIVE", "TRIALING"] }, cancelAtPeriodEnd: true },
+    data: { cancelAtPeriodEnd: false },
   });
 
   revalidatePath("/dashboard/subscription");

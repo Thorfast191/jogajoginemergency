@@ -35,3 +35,28 @@ export function qrBox(width: number, height: number, sizePct: number): Box {
 export function mmToPt(mm: number): number {
   return (mm * 72) / 25.4;
 }
+
+export type CaptionedQr = {
+  qrSize: number;
+  qrLeft: number;
+  captionTop: number;
+  captionHeight: number;
+  fontSize: number;
+};
+
+/**
+ * Inside the white square: the QR on top, the printed tag ID in a strip below
+ * it. The ID is the manual fallback when a camera can't read the code, so it
+ * gets a fixed share of the square rather than whatever space is left over.
+ */
+export function captionedQr(size: number): CaptionedQr {
+  const captionHeight = Math.max(1, Math.round(size * 0.14));
+  const qrSize = size - captionHeight;
+  return {
+    qrSize,
+    qrLeft: Math.floor((size - qrSize) / 2),
+    captionTop: qrSize,
+    captionHeight,
+    fontSize: Math.max(1, Math.round(captionHeight * 0.62)),
+  };
+}

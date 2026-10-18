@@ -97,6 +97,7 @@ export async function renderTagSticker(
     art: await artBytes(tag.theme.artAssetId),
     theme: tag.theme,
     url: tagUrl(tag.shortCode),
+    code: tag.shortCode,
     maxEdge: thumb ? THUMB_EDGE : undefined,
   });
   return { ...sticker, widthMm: tag.widthMm };

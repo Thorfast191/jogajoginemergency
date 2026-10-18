@@ -9,7 +9,7 @@
 import sharp from "sharp";
 import QRCode from "qrcode";
 import { PDFDocument } from "pdf-lib";
-import { mmToPt, qrBox } from "./sticker-layout";
+import { captionedQr, mmToPt, qrBox } from "./sticker-layout";
 
 export type StickerTheme = {
   name: string;
@@ -140,12 +140,17 @@ export function defaultArtworkSvg(theme: StickerTheme, size: number): string {
  * modules drawn at a whole number of pixels each so the print has no blurred
  * module edges. Runs of dark modules in a row are merged into one rectangle.
  */
-function qrSquareSvg(url: string, size: number): string {
+function qrSquareSvg(url: string, size: number, code?: string): string {
   const { modules } = QRCode.create(url, { errorCorrectionLevel: "Q" });
   const count = modules.size;
   const total = count + QUIET_MODULES * 2;
-  const px = Math.max(1, Math.floor(size / total));
+  // With a tag ID, the code takes the top of the square and the ID the strip
+  // below it — see captionedQr.
+  const layout = code ? captionedQr(size) : null;
+  const area = layout ? layout.qrSize : size;
+  const px = Math.max(1, Math.floor(area / total));
   const offset = Math.floor((size - px * total) / 2) + QUIET_MODULES * px;
+  const top = (layout ? Math.floor((area - px * total) / 2) : Math.floor((size - px * total) / 2)) + QUIET_MODULES * px;
 
   let d = "";
   for (let row = 0; row < count; row++) {
@@ -157,11 +162,15 @@ function qrSquareSvg(url: string, size: number): string {
       }
       const start = col;
       while (col < count && modules.get(row, col)) col++;
-      d += `M${offset + start * px} ${offset + row * px}h${(col - start) * px}v${px}h-${(col - start) * px}z`;
+      d += `M${offset + start * px} ${top + row * px}h${(col - start) * px}v${px}h-${(col - start) * px}z`;
     }
   }
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" shape-rendering="crispEdges"><rect width="${size}" height="${size}" fill="#FFFFFF"/><path fill="#000000" d="${d}"/></svg>`;
+  const caption = layout
+    ? `<text x="${size / 2}" y="${layout.captionTop + Math.round(layout.captionHeight * 0.72)}" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, Courier New, monospace" font-size="${layout.fontSize}" font-weight="700" fill="#000000">ID ${escapeXml(code!)}</text>`
+    : "";
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" shape-rendering="crispEdges"><rect width="${size}" height="${size}" fill="#FFFFFF"/><path fill="#000000" d="${d}"/>${caption}</svg>`;
 }
 
 /**
@@ -175,11 +184,14 @@ export async function renderSticker({
   art,
   theme,
   url,
+  code,
   maxEdge = DEFAULT_MAX_EDGE,
 }: {
   art: Buffer | null;
   theme: StickerTheme;
   url: string;
+  /** The tag's short code, printed under the QR as a manual fallback. */
+  code?: string;
   maxEdge?: number;
 }): Promise<RenderedSticker> {
   const base = art
@@ -195,7 +207,7 @@ export async function renderSticker({
 
   const { width, height } = base.info;
   const box = qrBox(width, height, theme.qrBoxSize);
-  const qr = await sharp(Buffer.from(qrSquareSvg(url, box.size))).png().toBuffer();
+  const qr = await sharp(Buffer.from(qrSquareSvg(url, box.size, code))).png().toBuffer();
 
   const png = await sharp(base.data)
     .composite([{ input: qr, left: box.left, top: box.top }])

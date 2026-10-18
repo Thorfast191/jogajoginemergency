@@ -99,7 +99,7 @@ export async function grantComplimentaryAction(
   const sub = latest
     ? await prisma.subscription.update({
         where: { id: latest.id },
-        data: { planId: plan.id, status: "TRIALING", currentPeriodEnd: end },
+        data: { planId: plan.id, status: "TRIALING", cancelAtPeriodEnd: false, currentPeriodEnd: end },
         select: { id: true },
       })
     : await prisma.subscription.create({

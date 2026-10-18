@@ -60,7 +60,13 @@ function Fields({ c }: { c?: Contact }) {
       />
       <label className="flex items-center gap-2 text-sm sm:col-span-2">
         <input type="checkbox" name="isPublic" defaultChecked={c ? c.isPublic : true} />
-        Show this contact on the public scan page
+        <span>
+          Show this contact on the public scan page
+          <span className="block text-xs text-black/50">
+            Only once they&apos;ve agreed. Nothing is shown until you switch on emergency contacts in
+            Privacy.
+          </span>
+        </span>
       </label>
     </div>
   );

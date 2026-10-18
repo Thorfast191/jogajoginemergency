@@ -29,6 +29,9 @@ Two connected products:
 - Without an active plan a scan reaches a **dormant page**: nothing about the owner is shown,
   but the anonymous relay stays open so a found item can still be returned. That is one named
   constant, `LAPSED_BEHAVIOUR` in `src/lib/entitlements.ts`.
+- **Cancelling keeps the paid time.** A customer's cancel sets `Subscription.cancelAtPeriodEnd`;
+  the page stays live until `currentPeriodEnd`, "Keep my plan" undoes it, and paying again clears
+  it. Staff "cancel now" is the only thing that ends a plan early (status `CANCELED`).
 - "Entitled" means status `ACTIVE`/`TRIALING` **and** a period end in the future. The rule lives
   in `src/lib/entitlements.ts` + `src/lib/subscription.ts` (`entitledWhere`), and every count in
   the console uses the same helper as the scan page.
@@ -304,6 +307,16 @@ without spending a slot but can never move a tag between accounts.
 
 ## Privacy & security
 
+- Every scan page (live, dormant, unknown/switched-off code, demo) leads with a **Call 999**
+  button and carries the "contact aid, not an emergency response provider" wording
+  (`src/components/scan-layout.tsx`); the demo's button doesn't dial. Medical details carry a
+  "not medically verified" note. The card splits **Emergency** from **Contact the owner**.
+- **Private by default.** A new profile starts on `MINIMAL` (`DEFAULT_PRESET` in
+  `src/lib/privacy.ts`). Publishing contacts, medical details or a phone number needs the owner to
+  agree to `CONSENT_TEXT` once; the time and wording version are stored on the profile. Owners who
+  published those before consent existed keep their page and get a review prompt on Privacy.
+- Printed stickers carry the tag ID under the QR (`captionedQr` in `src/lib/sticker-layout.ts`)
+  as a manual fallback.
 - The scan page renders **only** the DTO from `src/lib/public-profile.ts`; each field needs its
   own visibility flag. Scan pages are `noindex`, and logging runs in `after()` so the page is
   never held up.

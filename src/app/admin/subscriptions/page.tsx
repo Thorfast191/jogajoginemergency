@@ -145,6 +145,9 @@ export default async function AdminSubscriptionsPage({
                   <td className="py-3 px-4">
                     {s.currentPeriodEnd.getTime() > 0 ? s.currentPeriodEnd.toLocaleDateString() : "—"}
                     {left > 0 && <div className="text-xs text-black/40">{left} days left</div>}
+                    {left > 0 && s.cancelAtPeriodEnd && (
+                      <div className="text-xs text-amber-700">Cancelled · won&apos;t renew</div>
+                    )}
                   </td>
                   {seesMoney && (
                     <td className="py-3 px-4">

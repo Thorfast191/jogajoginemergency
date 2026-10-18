@@ -53,6 +53,7 @@ export async function SubscriptionSummary({
                 <span className="text-black/50">
                   until {latest.currentPeriodEnd.toLocaleDateString()}
                   {entitled ? ` · ${daysLeft(latest.currentPeriodEnd, at)} days left` : ""}
+                  {entitled && latest.cancelAtPeriodEnd ? " · cancelled, won't renew" : ""}
                 </span>
               )}
             </p>

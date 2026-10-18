@@ -3,7 +3,7 @@ import sharp from "sharp";
 import jsQR from "jsqr";
 import { PDFDocument } from "pdf-lib";
 import { defaultArtworkSvg, renderSticker, stickerPdf, type StickerTheme } from "../sticker";
-import { mmToPt, qrBox } from "../sticker-layout";
+import { captionedQr, mmToPt, qrBox } from "../sticker-layout";
 
 const theme: StickerTheme = {
   name: "Night Guardian",
@@ -115,5 +115,30 @@ describe("stickerPdf", () => {
     expect(first.getHeight()).toBeCloseTo(mmToPt(60), 3);
     // A 2:1 sticker keeps its proportions at the same printed width.
     expect(second.getHeight()).toBeCloseTo(mmToPt(30), 3);
+  });
+});
+
+describe("renderSticker — printed tag ID", () => {
+  it("still scans when the tag ID is printed under the code", async () => {
+    const sticker = await renderSticker({ art: null, theme, url, code: "Ab3dEf7h", maxEdge: 1200 });
+    expect(await decodeBox(sticker.png, sticker.width, sticker.height, theme.qrBoxSize)).toBe(url);
+  });
+
+  it("draws the ID into the caption strip, below the code's quiet zone", async () => {
+    const box = qrBox(1200, 1200, theme.qrBoxSize);
+    const l = captionedQr(box.size);
+    const darkIn = async (top: number, height: number) => {
+      const s = await renderSticker({ art: null, theme, url, code: "Ab3dEf7h", maxEdge: 1200 });
+      const { data } = await sharp(s.png)
+        .extract({ left: box.left, top: box.top + top, width: box.size, height })
+        .greyscale()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      return data.filter((v) => v < 128).length;
+    };
+    // The strip holds text, and the rows just above it are the QR's white
+    // quiet zone — so the ink in the strip is the ID, not stray modules.
+    expect(await darkIn(l.captionTop, l.captionHeight)).toBeGreaterThan(0);
+    expect(await darkIn(l.captionTop - 4, 4)).toBe(0);
   });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { clampBoxSize, mmToPt, qrBox, QR_BOX_DEFAULT } from "../sticker-layout";
+import { captionedQr, clampBoxSize, mmToPt, qrBox, QR_BOX_DEFAULT } from "../sticker-layout";
 
 describe("qrBox", () => {
   it("centres the square on square artwork", () => {
@@ -57,5 +57,29 @@ describe("clampBoxSize", () => {
 describe("mmToPt", () => {
   it("converts an inch to 72 points", () => {
     expect(mmToPt(25.4)).toBeCloseTo(72, 6);
+  });
+});
+
+describe("captionedQr", () => {
+  // The printed tag ID sits under the code inside the white square, so a
+  // sticker that won't scan can still be looked up by hand.
+  it("leaves the QR most of the square", () => {
+    const l = captionedQr(400);
+    expect(l.qrSize).toBeGreaterThanOrEqual(Math.round(400 * 0.8));
+    expect(l.qrSize).toBeLessThan(400);
+  });
+
+  it("puts the caption below the QR and inside the square", () => {
+    const l = captionedQr(400);
+    expect(l.captionTop).toBeGreaterThanOrEqual(l.qrSize);
+    expect(l.captionTop + l.captionHeight).toBeLessThanOrEqual(400);
+    expect(l.fontSize).toBeGreaterThan(0);
+    expect(l.fontSize).toBeLessThanOrEqual(l.captionHeight);
+  });
+
+  it("centres the QR horizontally in whole pixels", () => {
+    const l = captionedQr(401);
+    expect(Number.isInteger(l.qrLeft)).toBe(true);
+    expect(l.qrLeft).toBe(Math.floor((401 - l.qrSize) / 2));
   });
 });

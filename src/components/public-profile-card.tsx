@@ -16,8 +16,8 @@ function DemoRelay() {
     <div className="rounded-xl border border-dashed border-[var(--skin-line)] p-4 text-center text-sm">
       <p className="font-semibold">Message the owner</p>
       <p className="mt-1 text-[var(--skin-muted)]">
-        On a real sticker, a finder types a message here. It reaches the owner by email — their
-        number is never shown.
+        On a real sticker, you pick a reason or type a message here. It reaches the owner in their
+        dashboard and by email, and their number is never shown.
       </p>
     </div>
   );
@@ -60,7 +60,7 @@ export function PublicProfileCard({
           <h1 className="text-lg font-bold">Someone&apos;s belongings</h1>
           <p className="mt-2 text-sm text-[var(--skin-muted)]">
             {view.relayOpen
-              ? "This tag's details aren't published right now, but you can still send its owner a message and they'll get in touch."
+              ? "This tag's details aren't published right now. If anyone is hurt, call 999. You can still send its owner a message below."
               : "This tag isn't active right now."}
           </p>
         </div>
@@ -69,14 +69,10 @@ export function PublicProfileCard({
     );
   }
 
+  const hasEmergency = Boolean(view.emergencyMessage) || hasMedical || view.contacts.length > 0;
+
   return (
     <div className="text-[var(--skin-ink)]">
-      {view.lost && (
-        <div className="mb-4 rounded-lg bg-amber-100 text-amber-900 text-sm px-3 py-2 text-center font-medium">
-          The owner has marked this as lost — thank you for helping return it!
-        </div>
-      )}
-
       <div className="text-center">
         {view.photoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -92,46 +88,37 @@ export function PublicProfileCard({
         {view.bio && <p className="mt-1 text-sm text-[var(--skin-muted)]">{view.bio}</p>}
       </div>
 
-      <p className="mt-5 text-center text-xs font-semibold uppercase tracking-wide text-[var(--skin-muted)]">
-        Emergency information
-      </p>
+      {/* Two separate paths. Someone standing over an injured rider and someone
+          whose gate is blocked need different things, and each should find
+          theirs without reading the other. */}
+      <nav aria-label="What do you need?" className="mt-5 grid grid-cols-2 gap-2 text-sm font-semibold">
+        <a
+          href="#emergency"
+          className="rounded-xl border-2 border-[#B91C1C] px-3 py-3 text-center text-[#B91C1C] hover:bg-[#B91C1C]/5"
+        >
+          Emergency
+          <span className="block text-xs font-normal">Someone is hurt</span>
+        </a>
+        <a
+          href="#contact"
+          className="rounded-xl border-2 border-[var(--skin-accent)] px-3 py-3 text-center text-[var(--skin-ink)] hover:bg-[var(--skin-accent)]/5"
+        >
+          Contact the owner
+          <span className="block text-xs font-normal text-[var(--skin-muted)]">Vehicle or item needs attention</span>
+        </a>
+      </nav>
 
-      {view.emergencyMessage && (
-        <p className="mt-2 text-center text-sm text-[var(--skin-ink)]">{view.emergencyMessage}</p>
-      )}
+      <section id="emergency" aria-labelledby="emergency-heading" className="mt-6 scroll-mt-4">
+        <h2 id="emergency-heading" className="text-center text-xs font-semibold uppercase tracking-wide text-[var(--skin-muted)]">
+          Emergency information
+        </h2>
 
-      {hasMedical && (
-        <dl className="mt-4 rounded-xl border border-[var(--skin-line)] divide-y divide-[var(--skin-line)] text-sm">
-          {medical.map(([label, value]) =>
-            value ? (
-              <div key={label} className="flex justify-between gap-3 px-3 py-2">
-                <dt className="text-[var(--skin-muted)]">{label}</dt>
-                <dd className="text-right font-semibold">{value}</dd>
-              </div>
-            ) : null,
-          )}
-        </dl>
-      )}
-
-      <div className="mt-6">
-        {view.contactMode === "DIRECT_CALL" && view.phonePublic ? (
-          <a
-            href={`tel:${view.phonePublic}`}
-            className="block w-full rounded-xl bg-[var(--skin-accent)] text-white text-center px-4 py-3 font-semibold transition-transform hover:scale-[1.02] active:scale-[0.99]"
-          >
-            Call to return this
-          </a>
-        ) : (
-          relay
+        {view.emergencyMessage && (
+          <p className="mt-2 text-center text-sm text-[var(--skin-ink)]">{view.emergencyMessage}</p>
         )}
-      </div>
 
-      {view.contacts.length > 0 && (
-        <div className="mt-6">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--skin-muted)]">
-            Emergency contacts
-          </p>
-          <ul className="mt-2 space-y-2">
+        {view.contacts.length > 0 && (
+          <ul className="mt-4 space-y-2" aria-label="Emergency contacts">
             {view.contacts.map((c, i) => (
               <li key={i} className="rounded-xl border border-[var(--skin-line)] px-3 py-2 text-sm">
                 <p className="font-semibold">
@@ -143,7 +130,7 @@ export function PublicProfileCard({
                     (demo ? (
                       <span className="text-[var(--skin-accent)]">Call {c.phone}</span>
                     ) : (
-                      <a href={`tel:${c.phone}`} className="text-[var(--skin-accent)] hover:underline">
+                      <a href={`tel:${c.phone}`} className="font-semibold text-[var(--skin-accent)] hover:underline">
                         Call {c.phone}
                       </a>
                     ))}
@@ -156,8 +143,57 @@ export function PublicProfileCard({
               </li>
             ))}
           </ul>
+        )}
+
+        {hasMedical && (
+          <>
+            <dl className="mt-4 rounded-xl border border-[var(--skin-line)] divide-y divide-[var(--skin-line)] text-sm">
+              {medical.map(([label, value]) =>
+                value ? (
+                  <div key={label} className="flex justify-between gap-3 px-3 py-2">
+                    <dt className="text-[var(--skin-muted)]">{label}</dt>
+                    <dd className="text-right font-semibold">{value}</dd>
+                  </div>
+                ) : null,
+              )}
+            </dl>
+            <p className="mt-2 text-xs text-[var(--skin-muted)]">
+              Entered by the owner and not medically verified. Don&apos;t use it alone for treatment or
+              transfusion decisions.
+            </p>
+          </>
+        )}
+
+        {!hasEmergency && (
+          <p className="mt-2 text-center text-sm text-[var(--skin-muted)]">
+            The owner hasn&apos;t shared emergency details. Call 999 if anyone is hurt, or send the
+            owner a message below.
+          </p>
+        )}
+      </section>
+
+      <section id="contact" aria-labelledby="contact-heading" className="mt-6 scroll-mt-4">
+        <h2 id="contact-heading" className="text-center text-xs font-semibold uppercase tracking-wide text-[var(--skin-muted)]">
+          Contact the owner
+        </h2>
+        {view.lost && (
+          <div className="mt-2 rounded-lg bg-amber-100 text-amber-900 text-sm px-3 py-2 text-center font-medium">
+            The owner has marked this as lost. Thank you for helping return it!
+          </div>
+        )}
+        <div className="mt-3">
+          {view.contactMode === "DIRECT_CALL" && view.phonePublic ? (
+            <a
+              href={`tel:${view.phonePublic}`}
+              className="block w-full rounded-xl bg-[var(--skin-accent)] text-white text-center px-4 py-3 font-semibold transition-transform hover:scale-[1.02] active:scale-[0.99]"
+            >
+              Call the owner
+            </a>
+          ) : (
+            relay
+          )}
         </div>
-      )}
+      </section>
 
       {view.links.length > 0 && (
         <div className="mt-6">

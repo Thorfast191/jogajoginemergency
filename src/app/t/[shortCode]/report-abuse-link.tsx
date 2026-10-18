@@ -50,6 +50,7 @@ export function ReportAbuseLink({ shortCode }: { shortCode: string }) {
       <select
         value={reason}
         onChange={(e) => setReason(e.target.value)}
+        aria-label="Reason for reporting this tag"
         required
         className="rounded-md border border-[var(--skin-line)] bg-[var(--skin-surface)] px-2 py-1 text-xs text-[var(--skin-ink)]"
       >
@@ -57,6 +58,7 @@ export function ReportAbuseLink({ shortCode }: { shortCode: string }) {
         <option value="spam">Spam or scam</option>
         <option value="inappropriate">Inappropriate content</option>
         <option value="stolen">Suspected stolen item</option>
+        <option value="wrong-info">Wrong or outdated information</option>
         <option value="other">Other</option>
       </select>
       <button

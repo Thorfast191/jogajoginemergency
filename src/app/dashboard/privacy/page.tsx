@@ -5,10 +5,10 @@ import { prisma } from "@/lib/prisma";
 import { buildPublicProfileView } from "@/lib/public-profile";
 import { userIsEntitled } from "@/lib/subscription";
 import { PortfolioVisibility } from "./portfolio-visibility";
-import { FLAG_NAMES, type VisibilityFlags } from "@/lib/privacy";
+import { CONSENT_FLAGS, FIELD_LABELS, FLAG_NAMES, needsConsent, type VisibilityFlags } from "@/lib/privacy";
 import { PublicProfileCard } from "@/components/public-profile-card";
 import { ensureProfile } from "@/lib/profile";
-import { PrivacyControls } from "./privacy-controls";
+import { ConsentReview, PrivacyControls } from "./privacy-controls";
 
 export const dynamic = "force-dynamic";
 
@@ -37,8 +37,13 @@ export default async function PrivacyPage() {
     entitled,
   });
 
+  const unconsented = needsConsent(flags, profile.consentAt !== null)
+    ? CONSENT_FLAGS.filter((k) => flags[k]).map((k) => FIELD_LABELS[k].toLowerCase())
+    : [];
+
   return (
     <div>
+      {unconsented.length > 0 && <ConsentReview fields={unconsented} />}
       <h1 className="text-2xl font-bold">Privacy</h1>
       <p className="mt-1 text-sm text-black/60">
         Choose exactly what a finder sees when they scan your tag. Edit the content itself in{" "}

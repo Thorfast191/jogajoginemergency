@@ -167,6 +167,8 @@ export async function settlePayment(
         where: { id: payment.subscription.id },
         data: {
           status: "ACTIVE",
+          // Paying again is a decision to keep it — any cancellation is undone.
+          cancelAtPeriodEnd: false,
           currentPeriodEnd: extendPeriod(
             payment.subscription.currentPeriodEnd,
             payment.subscription.plan.intervalMonths,
@@ -219,6 +221,7 @@ async function activateSubscription(
         planId: params.planId,
         provider,
         status: "ACTIVE",
+        cancelAtPeriodEnd: false,
         currentPeriodEnd: extendPeriod(existing.currentPeriodEnd, params.intervalMonths, now),
       },
     });

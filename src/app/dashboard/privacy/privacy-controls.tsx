@@ -3,19 +3,8 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { updatePrivacyAction, type PrivacyInput } from "./actions";
-import type { VisibilityFlags } from "@/lib/privacy";
-
-const FIELD_LABELS: Record<keyof VisibilityFlags, string> = {
-  photoPublic: "Profile photo",
-  namePublic: "Display name",
-  messagePublic: "Emergency message",
-  bloodGroupPublic: "Blood group",
-  allergiesPublic: "Allergies",
-  medicalNotesPublic: "Medical notes",
-  contactsPublic: "Emergency contacts",
-  showPhone: "Public phone number",
-};
+import { confirmConsentAction, updatePrivacyAction, type PrivacyInput } from "./actions";
+import { CONSENT_TEXT, FIELD_LABELS, type VisibilityFlags } from "@/lib/privacy";
 
 const ORDER: (keyof VisibilityFlags)[] = [
   "photoPublic",
@@ -40,14 +29,22 @@ export function PrivacyControls({
 }) {
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  // A change the server held back until the owner agrees to CONSENT_TEXT.
+  const [awaiting, setAwaiting] = useState<PrivacyInput | null>(null);
   const router = useRouter();
 
   function run(input: PrivacyInput) {
     setError(null);
     start(async () => {
       const res = await updatePrivacyAction(input);
-      if (res.error) setError(res.error);
-      else router.refresh();
+      if (res.needsConsent) {
+        setAwaiting(input);
+      } else if (res.error) {
+        setError(res.error);
+      } else {
+        setAwaiting(null);
+        router.refresh();
+      }
     });
   }
 
@@ -99,7 +96,85 @@ export function PrivacyControls({
         ))}
       </ul>
 
+      {awaiting && (
+        <ConsentPanel
+          pending={pending}
+          onAgree={() => run({ ...awaiting, consent: true })}
+          onCancel={() => setAwaiting(null)}
+        />
+      )}
+
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+    </div>
+  );
+}
+
+function ConsentPanel({
+  pending,
+  onAgree,
+  onCancel,
+}: {
+  pending: boolean;
+  onAgree: () => void;
+  onCancel: () => void;
+}) {
+  const [agreed, setAgreed] = useState(false);
+  return (
+    <div role="alertdialog" aria-labelledby="consent-title" className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm">
+      <p id="consent-title" className="font-semibold">Before this goes public</p>
+      <label className="mt-2 flex items-start gap-2">
+        <input type="checkbox" className="mt-1" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
+        <span>{CONSENT_TEXT}</span>
+      </label>
+      <div className="mt-3 flex gap-2">
+        <button
+          type="button"
+          onClick={onAgree}
+          disabled={!agreed || pending}
+          className="rounded-md bg-emerald-600 px-3 py-1.5 font-medium text-white disabled:opacity-50"
+        >
+          Agree and publish
+        </button>
+        <button type="button" onClick={onCancel} className="rounded-md border border-black/15 px-3 py-1.5">
+          Keep it private
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * For an owner who published contacts or medical details before consent was
+ * asked for. Their page keeps working; this asks them to confirm or change it.
+ */
+export function ConsentReview({ fields }: { fields: string[] }) {
+  const [pending, start] = useTransition();
+  const [agreed, setAgreed] = useState(false);
+  const router = useRouter();
+  return (
+    <div className="mb-6 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm">
+      <p className="font-semibold">Please review what your scan page shows</p>
+      <p className="mt-1 text-black/70">
+        Anyone who scans your QR code can currently see: {fields.join(", ")}. Switch off anything you
+        don&apos;t want shown, or confirm below.
+      </p>
+      <label className="mt-3 flex items-start gap-2">
+        <input type="checkbox" className="mt-1" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
+        <span>{CONSENT_TEXT}</span>
+      </label>
+      <button
+        type="button"
+        disabled={!agreed || pending}
+        onClick={() =>
+          start(async () => {
+            await confirmConsentAction();
+            router.refresh();
+          })
+        }
+        className="mt-3 rounded-md bg-emerald-600 px-3 py-1.5 font-medium text-white disabled:opacity-50"
+      >
+        Confirm
+      </button>
     </div>
   );
 }

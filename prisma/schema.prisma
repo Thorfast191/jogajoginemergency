@@ -212,14 +212,17 @@ model SubscriptionPlan {
 }
 
 model Subscription {
-  id               String             @id @default(cuid())
-  userId           String
-  planId           String
-  status           SubscriptionStatus @default(ACTIVE)
-  provider         PaymentProvider    @default(DEMO)
-  currentPeriodEnd DateTime
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
+  id                String             @id @default(cuid())
+  userId            String
+  planId            String
+  status            SubscriptionStatus @default(ACTIVE)
+  provider          PaymentProvider    @default(DEMO)
+  currentPeriodEnd  DateTime
+  // The customer cancelled: nothing renews, but the page stays live until
+  // currentPeriodEnd. Paying again clears it. Staff "cancel now" uses status.
+  cancelAtPeriodEnd Boolean            @default(false)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
 
   user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   plan     SubscriptionPlan @relation(fields: [planId], references: [id])
@@ -487,17 +490,24 @@ model EmergencyProfile {
   bio                String?
   contactMode        ContactMode      @default(RELAY)
   phonePublic        String?
-  visibilityPreset   VisibilityPreset @default(STANDARD)
-  photoPublic        Boolean          @default(true)
-  namePublic         Boolean          @default(true)
+  // New profiles start private (MINIMAL) — see DEFAULT_PRESET in
+  // src/lib/privacy.ts. These defaults only govern rows created from now on.
+  visibilityPreset   VisibilityPreset @default(MINIMAL)
+  photoPublic        Boolean          @default(false)
+  namePublic         Boolean          @default(false)
   messagePublic      Boolean          @default(true)
   bloodGroupPublic   Boolean          @default(false)
   allergiesPublic    Boolean          @default(false)
   medicalNotesPublic Boolean          @default(false)
-  contactsPublic     Boolean          @default(true)
+  contactsPublic     Boolean          @default(false)
   showPhone          Boolean          @default(false)
   bioPublic          Boolean          @default(false)
   linksPublic        Boolean          @default(true)
+  // When the owner agreed to publish consent-sensitive fields (contacts,
+  // medical details, a phone number) and which wording they agreed to. Null
+  // means they never have — see CONSENT_FLAGS in src/lib/privacy.ts.
+  consentAt          DateTime?
+  consentVersion     String?
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
 

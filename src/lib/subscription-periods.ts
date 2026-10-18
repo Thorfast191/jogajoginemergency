@@ -77,3 +77,15 @@ export function intervalLabel(months: number): string {
   if (months === 12) return "year";
   return `${months} months`;
 }
+
+/**
+ * A plan the customer cancelled that still has paid time left. Cancelling only
+ * stops it being renewed; the page stays live until the period ends.
+ */
+export function endsWithoutRenewal(
+  s: { status: string; currentPeriodEnd: Date; cancelAtPeriodEnd: boolean },
+  now: Date,
+): boolean {
+  const bucket = subscriptionBucket(s, now);
+  return s.cancelAtPeriodEnd && (bucket === "active" || bucket === "expiring");
+}

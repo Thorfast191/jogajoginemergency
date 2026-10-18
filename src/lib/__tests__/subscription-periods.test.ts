@@ -5,6 +5,7 @@ import {
   extendPeriod,
   intervalLabel,
   subscriptionBucket,
+  endsWithoutRenewal,
 } from "../subscription-periods";
 
 const at = (iso: string) => new Date(iso);
@@ -79,5 +80,34 @@ describe("intervalLabel", () => {
     expect(intervalLabel(1)).toBe("month");
     expect(intervalLabel(6)).toBe("6 months");
     expect(intervalLabel(12)).toBe("year");
+  });
+});
+
+describe("endsWithoutRenewal", () => {
+  const now = at("2026-10-18T00:00:00Z");
+  const future = at("2027-01-01T00:00:00Z");
+
+  // Cancelling stops the next renewal; it does not take back the time already
+  // paid for. The page stays live until the period ends.
+  it("is true for a cancelled plan that still has paid time left", () => {
+    expect(
+      endsWithoutRenewal({ status: "ACTIVE", currentPeriodEnd: future, cancelAtPeriodEnd: true }, now),
+    ).toBe(true);
+  });
+
+  it("is false for a plan that has not been cancelled", () => {
+    expect(
+      endsWithoutRenewal({ status: "ACTIVE", currentPeriodEnd: future, cancelAtPeriodEnd: false }, now),
+    ).toBe(false);
+  });
+
+  it("is false once the period is over", () => {
+    expect(
+      endsWithoutRenewal({ status: "ACTIVE", currentPeriodEnd: at("2026-10-01T00:00:00Z"), cancelAtPeriodEnd: true }, now),
+    ).toBe(false);
+  });
+
+  it("keeps a cancelled-but-paid plan in the active buckets, not 'cancelled'", () => {
+    expect(subscriptionBucket({ status: "ACTIVE", currentPeriodEnd: future }, now)).toBe("active");
   });
 });
